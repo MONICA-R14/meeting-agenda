@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agenda Builder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #121417;
+            --surface: rgba(255,255,255,0.04);
+            --surface-hover: rgba(255,255,255,0.07);
+            --border: rgba(255,255,255,0.08);
+            --gold: #d4a373;
+            --gold-light: #fcf6ba;
+            --gold-gradient: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fcf6ba, #aa771c);
+            --text: #e8e2d9;
+            --text-muted: #888;
+            --glow: rgba(255, 214, 110, 0.15);
+            --danger: #ff6b6b;
+            --success: #6bffaa;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Ambient glow background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse, var(--glow), transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── NAVBAR ── */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.2rem 2.5rem;
+            background: rgba(18, 20, 23, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-brand {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 500;
+            background: var(--gold-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .nav-user {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .nav-user span {
+            color: var(--gold);
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            padding: 8px 18px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: 'DM Sans', sans-serif;
+            transition: 0.3s;
+        }
+
+        .logout-btn:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        /* ── MAIN LAYOUT ── */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 0;
+            min-height: calc(100vh - 65px);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── LEFT PANEL (Form) ── */
+        .left-panel {
+            padding: 2.5rem;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .panel-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+            color: var(--text);
+            line-height: 1.4;
+            margin-bottom: 0.3rem;
+        }
+
+        .panel-title span {
+            display: block;
+            background: var(--gold-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .panel-subtitle {
+            font-size: 0.83rem;
+            color: var(--text-muted);
+            margin-top: 0.4rem;
+            line-height: 1.6;
+        }
+
+        /* Form */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            padding: 14px 18px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: 0.3s;
+            resize: none;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            border-color: var(--gold);
+            background: var(--surface-hover);
+        }
+
+        .form-group select option {
+            background: #1c1f24;
+        }
+
+        .generate-btn {
+            padding: 16px;
+            background: var(--gold-gradient);
+            border: none;
+            border-radius: 14px;
+            color: #121417;
+            font-weight: 600;
+            font-size: 1rem;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 0.5rem;
+        }
+
+        .generate-btn:hover { transform: scale(1.02); opacity: 0.95; }
+        .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #121417;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Message */
+        .message {
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        .message.error { background: rgba(255,80,80,0.1); color: var(--danger); border: 1px solid rgba(255,80,80,0.2); display: block; }
+        .message.success { background: rgba(80,255,150,0.1); color: var(--success); border: 1px solid rgba(80,255,150,0.2); display: block; }
+
+        /* ── RIGHT PANEL ── */
+        .right-panel {
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            overflow-y: auto;
+        }
+
+        /* Agenda Result */
+        .agenda-result {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2rem;
+            display: none;
+            animation: fadeUp 0.5s ease;
+        }
+
+        .agenda-result.visible { display: block; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .agenda-result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .agenda-result-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .copy-btn {
+            padding: 7px 16px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            transition: 0.3s;
+        }
+
+        .copy-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+        .agenda-content {
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: var(--text);
+            white-space: pre-wrap;
+        }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 1rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 4rem;
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            opacity: 0.3;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+            max-width: 280px;
+            line-height: 1.6;
+        }
+
+        /* History */
+        .history-section { display: none; }
+        .history-section.visible { display: block; }
+
+        .history-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            font-weight: 400;
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+        }
+
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .history-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.2rem;
+            cursor: pointer;
+            transition: 0.3s;
+            position: relative;
+        }
+
+        .history-card:hover {
+            border-color: var(--gold);
+            background: var(--surface-hover);
+        }
+
+        .history-card-goal {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-card-meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .delete-card-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 4px;
+            border-radius: 6px;
+            transition: 0.2s;
+            line-height: 1;
+        }
+
+        .delete-card-btn:hover { color: var(--danger); background: rgba(255,80,80,0.1); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab-btn {
+            padding: 8px 20px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 20px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            transition: 0.3s;
+        }
+
+        .tab-btn.active {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: rgba(212,163,115,0.08);
+        }
+
+        /* Skeleton loader */
+        .skeleton {
+            background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+            height: 16px;
+            margin-bottom: 10px;
+        }
+
+        @keyframes shimmer { to { background-position: -200% 0; } }
+
+        @media (max-width: 768px) {
+            .main-layout { grid-template-columns: 1fr; }
+            .left-panel { border-right: none; border-bottom: 1px solid var(--border); }
+            nav { padding: 1rem 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav>
+    <div class="nav-brand">✦ Agenda Builder</div>
+    <div class="nav-right">
+        <div class="nav-user">Hello, <span id="user-name">User</span></div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</nav>
+
+<!-- Main Layout -->
+<div class="main-layout">
+
+    <!-- LEFT: Form -->
+    <div class="left-panel">
+        <div>
+            <h1 class="panel-title">
+                Generate Your
+                <span>Meeting Agenda</span>
+            </h1>
+            <p class="panel-subtitle">Fill in the details and let AI structure the perfect agenda for you.</p>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <div class="form-group">
+            <label>Meeting Goal</label>
+            <textarea id="goal" rows="3" placeholder="e.g. Plan Q1 marketing strategy and align on priorities..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Attendees</label>
+            <input type="text" id="attendees" placeholder="e.g. Marketing team, CEO, Designer" />
+        </div>
+
+        <div class="form-group">
+            <label>Duration (minutes)</label>
+            <select id="duration">
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="45" selected>45 minutes</option>
+                <option value="60">60 minutes</option>
+                <option value="90">90 minutes</option>
+                <option value="120">2 hours</option>
+            </select>
+        </div>
+
+        <button class="generate-btn" id="generate-btn" onclick="generateAgenda()">
+            ✦ Generate Agenda
+        </button>
+    </div>
+
+    <!-- RIGHT: Result + History -->
+    <div class="right-panel">
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('result', this)">Result</button>
+            <button class="tab-btn" onclick="switchTab('history', this)">Past Agendas</button>
+        </div>
+
+        <!-- Result Tab -->
+        <div id="result-tab">
+            <div class="empty-state" id="empty-state">
+                <div class="empty-icon">📋</div>
+                <p>Your generated agenda will appear here. Fill in the form and click Generate.</p>
+            </div>
+
+            <div class="agenda-result" id="agenda-result">
+                <div class="agenda-result-header">
+                    <div class="agenda-result-title">✦ Generated Agenda</div>
+                    <button class="copy-btn" onclick="copyAgenda()">Copy</button>
+                </div>
+                <div class="agenda-content" id="agenda-content"></div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history-tab" style="display:none;">
+            <div class="history-section visible" id="history-section">
+                <p class="history-title">Your past agendas</p>
+                <div class="history-grid" id="history-grid">
+                    <!-- Cards injected here -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:5000/api';
+
+    // ── Auth check ──
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (!token) {
+        window.location.href = 'login.html';
+    }
+
+    document.getElementById('user-name').textContent = user.name || 'User';
+
+    function logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = 'login.html';
+    }
+
+    // ── Message ──
+    function showMessage(text, type) {
+        const msg = document.getElementById('message');
+        msg.textContent = text;
+        msg.className = `message ${type}`;
+        setTimeout(() => { msg.className = 'message'; }, 4000);
+    }
+
+    // ── Tabs ──
+    function switchTab(tab, el) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+
+        document.getElementById('result-tab').style.display = tab === 'result' ? 'block' : 'none';
+        document.getElementById('history-tab').style.display = tab === 'history' ? 'block' : 'none';
+
+        if (tab === 'history') loadHistory();
+    }
+
+    // ── Generate Agenda ──
+    async function generateAgenda() {
+        const goal = document.getElementById('goal').value.trim();
+        const attendees = document.getElementById('attendees').value.trim();
+        const duration = document.getElementById('duration').value;
+        const btn = document.getElementById('generate-btn');
+
+        if (!goal || !attendees) {
+            showMessage('Please fill in all fields', 'error');
+            return;
+        }
+
+        // Loading
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div> Generating...';
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('agenda-result').classList.remove('visible');
+
+        // Show skeleton
+        document.getElementById('agenda-result').classList.add('visible');
+        document.getElementById('agenda-content').innerHTML = `
+            <div class="skeleton" style="width:60%"></div>
+            <div class="skeleton" style="width:90%"></div>
+            <div class="skeleton" style="width:75%"></div>
+            <div class="skeleton" style="width:85%"></div>
+            <div class="skeleton" style="width:50%"></div>
+        `;
+
+        try {
+            const res = await fetch(`${API_URL}/agenda/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ goal, attendees, duration: parseInt(duration) })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    logout();
+                    return;
+                }
+                showMessage(data.message || 'Failed to generate agenda', 'error');
+                document.getElementById('agenda-result').classList.remove('visible');
+                document.getElementById('empty-state').style.display = 'flex';
+            } else {
+                document.getElementById('agenda-content').textContent = data.agenda;
+                showMessage('✅ Agenda generated!', 'success');
+            }
+
+        } catch (err) {
+            showMessage('❌ Cannot connect to server', 'error');
+            document.getElementById('agenda-result').classList.remove('visible');
+            document.getElementById('empty-state').style.display = 'flex';
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '✦ Generate Agenda';
+    }
+
+    // ── Copy Agenda ──
+    function copyAgenda() {
+        const text = document.getElementById('agenda-content').textContent;
+        navigator.clipboard.writeText(text);
+        const btn = document.querySelector('.copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    }
+
+    // ── Load History ──
+    async function loadHistory() {
+        const grid = document.getElementById('history-grid');
+        grid.innerHTML = '<div class="skeleton" style="height:80px;border-radius:16px"></div><div class="skeleton" style="height:80px;border-radius:16px"></div>';
+
+        try {
+            const res = await fetch(`${API_URL}/agenda/history`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+
+            if (!data.length) {
+                grid.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">No agendas yet. Generate your first one!</p>';
+                return;
+            }
+
+            grid.innerHTML = '';
+            data.forEach(meeting => {
+                const date = new Date(meeting.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const card = document.createElement('div');
+                card.className = 'history-card';
+                card.innerHTML = `
+                    <button class="delete-card-btn" onclick="deleteAgenda('${meeting._id}', event)" title="Delete">✕</button>
+                    <div class="history-card-goal">${meeting.goal}</div>
+                    <div class="history-card-meta">
+                        <span>👥 ${meeting.attendees}</span>
+                        <span>⏱ ${meeting.duration}min</span>
+                        <span>${date}</span>
+                    </div>
+                `;
+                card.onclick = () => viewHistory(meeting);
+                grid.appendChild(card);
+            });
+
+        } catch (err) {
+            grid.innerHTML = '<p style="color:var(--danger);font-size:0.9rem;">Failed to load history</p>';
+        }
+    }
+
+    // ── View History Item ──
+    function viewHistory(meeting) {
+        switchTab('result', document.querySelectorAll('.tab-btn')[0]);
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('agenda-content').textContent = meeting.agenda;
+        document.getElementById('agenda-result').classList.add('visible');
+    }
+
+    // ── Delete Agenda ──
+    async function deleteAgenda(id, event) {
+        event.stopPropagation();
+        if (!confirm('Delete this agenda?')) return;
+
+        try {
+            await fetch(`${API_URL}/agenda/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            loadHistory();
+        } catch (err) {
+            showMessage('Failed to delete', 'error');
+        }
+    }
+</script>
+
+</body>
+</html>
