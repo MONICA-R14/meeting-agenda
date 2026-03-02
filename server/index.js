@@ -17,7 +17,7 @@ app.use((req, res, next) => {
 });
 
 // Serve Frontend
-app.use(express.static(path.join(__dirname, '../client')));
+app.use(express.static(path.join(__dirname, '..', 'client')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -26,6 +26,11 @@ app.use('/api/agenda', require('./routes/agenda'));
 // Test route
 app.get('/api', (req, res) => {
   res.json({ message: '🚀 Meeting Agenda Builder API is running!' });
+});
+
+// Serve index.html for all non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
 });
 
 // MongoDB Connect
