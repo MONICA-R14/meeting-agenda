@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -8,18 +9,22 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-// Add this after app.use(express.json());
+
+// Log all requests
 app.use((req, res, next) => {
     console.log(req.method, req.url);
     next();
 });
+
+// Serve Frontend
+app.use(express.static(path.join(__dirname, '../client')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/agenda', require('./routes/agenda'));
 
 // Test route
-app.get('/', (req, res) => {
+app.get('/api', (req, res) => {
   res.json({ message: '🚀 Meeting Agenda Builder API is running!' });
 });
 
