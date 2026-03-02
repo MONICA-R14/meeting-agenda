@@ -16,8 +16,8 @@ app.use((req, res, next) => {
     next();
 });
 
-// Serve Frontend
-app.use(express.static(path.join(__dirname, '..', 'client')));
+// Serve Frontend (client folder inside server)
+app.use(express.static(path.join(__dirname, 'client')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -30,7 +30,7 @@ app.get('/api', (req, res) => {
 
 // Serve index.html for all non-API routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
+  res.sendFile(path.join(__dirname, 'client', 'index.html'));
 });
 
 // MongoDB Connect
