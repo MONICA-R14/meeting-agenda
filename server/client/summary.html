@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Summary | Agenda Builder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="sidebar.css" />
+    <style>
+        :root {
+            --bg: #0d0d1a;
+            --card: #16213e;
+            --text: #e8e2d9;
+            --muted: #97a0b5;
+            --border: rgba(255, 255, 255, 0.1);
+            --gold: #c9a84c;
+            --success: #6cd98e;
+            --danger: #ff6f7d;
+            --summary-header: #1e3a5f;
+            --decision-header: #c9a84c;
+            --action-header: #00bcd4;
+            --topic-header: #9c27b0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: radial-gradient(circle at 10% 20%, rgba(201, 168, 76, 0.08), transparent 40%),
+                radial-gradient(circle at 90% 0%, rgba(0, 188, 212, 0.1), transparent 35%),
+                var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+        }
+
+        .app-shell {
+            min-height: 100vh;
+        }
+
+        .page {
+            padding: 26px;
+            min-height: 100vh;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 20px;
+            min-height: calc(100vh - 52px);
+        }
+
+        .panel {
+            background: rgba(22, 33, 62, 0.68);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+        }
+
+        .left-panel {
+            padding: 1.4rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            position: relative;
+            z-index: 2;
+            pointer-events: auto;
+        }
+
+        .panel-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.7rem;
+            font-weight: 500;
+            color: var(--gold);
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+        }
+
+        .panel-subtitle {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-top: -0.2rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+            position: relative;
+            z-index: 3;
+        }
+
+        .left-panel input,
+        .left-panel textarea {
+            pointer-events: all !important;
+            position: relative;
+            z-index: 10 !important;
+        }
+
+        .form-group label {
+            font-size: 0.78rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .input,
+        .textarea {
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            background: rgba(8, 10, 24, 0.65);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.95rem;
+            padding: 0.8rem 0.9rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .input:focus,
+        .textarea:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.18);
+        }
+
+        .input[readonly] {
+            color: #cdd2df;
+            background: rgba(20, 24, 48, 0.75);
+        }
+
+        .textarea {
+            background: #1a1a2e;
+            color: #ffffff;
+            border: 1px solid #c9a84c;
+            padding: 12px;
+            width: 100%;
+            min-height: 150px;
+            border-radius: 8px;
+            font-size: 14px;
+            resize: vertical;
+            pointer-events: auto;
+            opacity: 1;
+        }
+
+        #meetingNotes {
+            pointer-events: all !important;
+            position: relative !important;
+            z-index: 10 !important;
+            cursor: text !important;
+        }
+
+        .counter {
+            text-align: right;
+            color: var(--muted);
+            font-size: 0.78rem;
+            margin-top: 0.35rem;
+        }
+
+        .generate-btn {
+            margin-top: 0.3rem;
+            border: none;
+            border-radius: 12px;
+            padding: 0.9rem 1rem;
+            font-size: 0.98rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: #161515;
+            background: linear-gradient(135deg, #d8b968, var(--gold));
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.03);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.72;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .spinner {
+            width: 17px;
+            height: 17px;
+            border: 2px solid rgba(13, 13, 26, 0.8);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        .generate-btn.loading .spinner {
+            display: inline-block;
+        }
+
+        .right-panel {
+            padding: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .results {
+            display: none;
+            opacity: 0;
+            transform: translateY(16px);
+        }
+
+        .results.visible {
+            display: block;
+            animation: reveal 0.45s ease forwards;
+        }
+
+        .cards {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .result-card {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: rgba(20, 31, 58, 0.9);
+        }
+
+        .card-header {
+            padding: 0.62rem 0.9rem;
+            font-weight: 600;
+            color: #eef3ff;
+            font-size: 0.9rem;
+        }
+
+        .summary-header {
+            background: var(--summary-header);
+        }
+
+        .decisions-header {
+            background: var(--decision-header);
+            color: #1a1507;
+        }
+
+        .actions-header {
+            background: var(--action-header);
+            color: #042229;
+        }
+
+        .topics-header {
+            background: var(--topic-header);
+        }
+
+        .card-body {
+            padding: 0.9rem;
+            color: #dbe2f3;
+            line-height: 1.7;
+            font-size: 0.94rem;
+        }
+
+        .decisions-list {
+            margin: 0;
+            padding-left: 1.4rem;
+        }
+
+        .decisions-list li {
+            margin-bottom: 0.45rem;
+        }
+
+        .decisions-list li::marker {
+            color: var(--gold);
+            font-weight: 700;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 520px;
+        }
+
+        .items-table th,
+        .items-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 0.62rem;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .items-table th {
+            color: #9ec9d0;
+            font-weight: 500;
+        }
+
+        .row-done td {
+            color: var(--success);
+            text-decoration: line-through;
+            text-decoration-thickness: 2px;
+        }
+
+        .topic-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .chip {
+            padding: 0.35rem 0.7rem;
+            border-radius: 999px;
+            background: rgba(156, 39, 176, 0.22);
+            border: 1px solid rgba(156, 39, 176, 0.45);
+            color: #eecdf5;
+            font-size: 0.84rem;
+        }
+
+        .bottom-actions {
+            display: none;
+            margin-top: 0.25rem;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+
+        .bottom-actions.visible {
+            display: flex;
+        }
+
+        .action-btn {
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .pdf-btn {
+            background: var(--gold);
+            color: #18130a;
+        }
+
+        .home-btn {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .toast-stack {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            z-index: 2000;
+        }
+
+        .toast {
+            min-width: 260px;
+            max-width: 340px;
+            border-radius: 11px;
+            border: 1px solid;
+            padding: 0.7rem 0.85rem;
+            color: #fff;
+            font-size: 0.88rem;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+            animation: toastIn 0.22s ease;
+        }
+
+        .toast.success {
+            background: rgba(43, 122, 67, 0.96);
+            border-color: rgba(129, 234, 166, 0.5);
+        }
+
+        .toast.error {
+            background: rgba(139, 37, 52, 0.96);
+            border-color: rgba(255, 133, 149, 0.45);
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes reveal {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @media (max-width: 1180px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .page {
+                padding: 14px;
+            }
+
+            .left-panel,
+            .right-panel {
+                padding: 1rem;
+            }
+
+            .panel-title {
+                font-size: 1.45rem;
+            }
+
+            .toast {
+                min-width: 220px;
+                max-width: 88vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Agenda Builder</div>
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a class="sidebar-link" href="main.html" data-page="main.html"><span class="sidebar-icon">🏠</span><span class="sidebar-label">Home</span></a>
+            <a class="sidebar-link" href="calendar.html" data-page="calendar.html"><span class="sidebar-icon">📅</span><span class="sidebar-label">Calendar</span></a>
+            <a class="sidebar-link" href="timer.html" data-page="timer.html"><span class="sidebar-icon">⏱️</span><span class="sidebar-label">Meeting Timer</span></a>
+            <a class="sidebar-link" href="summary.html" data-page="summary.html"><span class="sidebar-icon">📝</span><span class="sidebar-label">Summary</span></a>
+            <a class="sidebar-link" href="teams.html" data-page="teams.html"><span class="sidebar-icon">👥</span><span class="sidebar-label">Teams</span></a>
+            <a class="sidebar-link" href="tracker.html" data-page="tracker.html"><span class="sidebar-icon">✅</span><span class="sidebar-label">Action Tracker</span></a>
+            <a class="sidebar-link" href="attendance.html" data-page="attendance.html"><span class="sidebar-icon">📊</span><span class="sidebar-label">Attendance</span></a>
+            <a class="sidebar-link" href="admin.html" data-page="admin.html"><span class="sidebar-icon">⚙️</span><span class="sidebar-label">Admin Panel</span></a>
+            <a class="sidebar-link" href="#" id="sidebar-logout"><span class="sidebar-icon">🚪</span><span class="sidebar-label">Logout</span></a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <span class="sidebar-icon">👤</span>
+                <span class="sidebar-user-name" id="sidebar-user-name">Guest User</span>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-shell">
+        <main class="page">
+            <div class="layout">
+                <section class="panel left-panel">
+                    <div>
+                        <h1 class="panel-title"><span>📄</span> Post Meeting Summary</h1>
+                        <p class="panel-subtitle">Capture your raw notes and generate structured outcomes instantly.</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="meetingGoal">Meeting Goal</label>
+                        <input id="meetingGoal" class="input" type="text" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="attendees">Attendees</label>
+                        <input id="attendees" class="input" type="text" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="duration">Duration (minutes)</label>
+                        <input id="duration" class="input" type="number" min="1" placeholder="e.g. 45" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="language">Agenda Language</label>
+                        <select id="language" class="input">
+                            <option value="English" selected>🇬🇧 English</option>
+                            <option value="Tamil">🇮🇳 Tamil</option>
+                            <option value="Hindi">🇮🇳 Hindi</option>
+                            <option value="French">🇫🇷 French</option>
+                            <option value="Spanish">🇪🇸 Spanish</option>
+                            <option value="German">🇩🇪 German</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="meetingNotes">Meeting Notes</label>
+                        <textarea id="meetingNotes" class="textarea" placeholder="Type your meeting notes here..."></textarea>
+                        <div id="charCounter" class="counter">0 characters</div>
+                    </div>
+
+                    <button id="generateBtn" class="generate-btn" type="button">
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span id="generateBtnText">Generate Summary</span>
+                    </button>
+                </section>
+
+                <section class="panel right-panel">
+                    <div id="results" class="results" aria-live="polite">
+                        <div class="cards">
+                            <article class="result-card">
+                                <div class="card-header summary-header">Meeting Summary</div>
+                                <div class="card-body" id="summaryText">-</div>
+                            </article>
+
+                            <article class="result-card">
+                                <div class="card-header decisions-header">Key Decisions</div>
+                                <div class="card-body">
+                                    <ol id="decisionsList" class="decisions-list"></ol>
+                                </div>
+                            </article>
+
+                            <article class="result-card">
+                                <div class="card-header actions-header">Action Items</div>
+                                <div class="card-body table-wrap">
+                                    <table class="items-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Done</th>
+                                                <th>Task</th>
+                                                <th>Assignee</th>
+                                                <th>Deadline</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="actionItemsBody"></tbody>
+                                    </table>
+                                </div>
+                            </article>
+
+                            <article class="result-card">
+                                <div class="card-header topics-header">Next Meeting Topics</div>
+                                <div class="card-body">
+                                    <div id="topicsChips" class="topic-chips"></div>
+                                </div>
+                            </article>
+                        </div>
+
+                        <div id="bottomActions" class="bottom-actions">
+                            <button id="exportPdfBtn" class="action-btn pdf-btn" type="button">Export PDF</button>
+                            <button id="backHomeBtn" class="action-btn home-btn" type="button">Back to Home</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="toastStack" class="toast-stack" aria-live="assertive"></div>
+
+    <script>
+        const API_URL = '/api';
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            window.location.href = 'index.html';
+        }
+
+        const meetingGoalInput = document.getElementById('meetingGoal');
+        const attendeesInput = document.getElementById('attendees');
+        const durationInput = document.getElementById('duration');
+        const languageInput = document.getElementById('language');
+        const notesInput = document.getElementById('meetingNotes');
+        const charCounter = document.getElementById('charCounter');
+        const generateBtn = document.getElementById('generateBtn');
+        const generateBtnText = document.getElementById('generateBtnText');
+        const results = document.getElementById('results');
+        const summaryText = document.getElementById('summaryText');
+        const decisionsList = document.getElementById('decisionsList');
+        const actionItemsBody = document.getElementById('actionItemsBody');
+        const topicsChips = document.getElementById('topicsChips');
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
+        const backHomeBtn = document.getElementById('backHomeBtn');
+        const bottomActions = document.getElementById('bottomActions');
+        const toastStack = document.getElementById('toastStack');
+
+        function getStoredValue(key, fallback) {
+            const value = localStorage.getItem(key);
+            return value && value.trim() ? value.trim() : fallback;
+        }
+
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            toastStack.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        function updateCharCounter() {
+            charCounter.textContent = `${notesInput.value.length} characters`;
+        }
+
+        function setLoading(loading) {
+            generateBtn.disabled = loading;
+            generateBtn.classList.toggle('loading', loading);
+            generateBtnText.textContent = loading ? 'Generating...' : 'Generate Summary';
+        }
+
+        function renderDecisions(items) {
+            decisionsList.innerHTML = '';
+            if (!Array.isArray(items) || !items.length) {
+                const empty = document.createElement('li');
+                empty.textContent = 'No key decisions captured.';
+                decisionsList.appendChild(empty);
+                return;
+            }
+
+            items.forEach((decision) => {
+                const li = document.createElement('li');
+                li.textContent = decision;
+                decisionsList.appendChild(li);
+            });
+        }
+
+        function renderActionItems(items) {
+            actionItemsBody.innerHTML = '';
+
+            if (!Array.isArray(items) || !items.length) {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td>-</td><td colspan="3">No action items captured.</td>';
+                actionItemsBody.appendChild(row);
+                return;
+            }
+
+            items.forEach((item, index) => {
+                const row = document.createElement('tr');
+                const checkboxId = `item-${index}`;
+                row.innerHTML = `
+                    <td><input type="checkbox" id="${checkboxId}" aria-label="Mark action item complete" /></td>
+                    <td>${item.task || '-'}</td>
+                    <td>${item.assignee || '-'}</td>
+                    <td>${item.deadline || '-'}</td>
+                `;
+
+                const checkbox = row.querySelector('input[type="checkbox"]');
+                checkbox.addEventListener('change', function () {
+                    row.classList.toggle('row-done', checkbox.checked);
+                });
+
+                actionItemsBody.appendChild(row);
+            });
+        }
+
+        function renderTopics(items) {
+            topicsChips.innerHTML = '';
+            if (!Array.isArray(items) || !items.length) {
+                const chip = document.createElement('span');
+                chip.className = 'chip';
+                chip.textContent = 'No topics suggested';
+                topicsChips.appendChild(chip);
+                return;
+            }
+
+            items.forEach((topic) => {
+                const chip = document.createElement('span');
+                chip.className = 'chip';
+                chip.textContent = topic;
+                topicsChips.appendChild(chip);
+            });
+        }
+
+        function showResults(payload) {
+            summaryText.textContent = payload.summary || 'No summary returned.';
+            renderDecisions(payload.keyDecisions || []);
+            renderActionItems(payload.actionItems || []);
+            renderTopics(payload.nextMeetingTopics || []);
+            results.classList.add('visible');
+            bottomActions.classList.add('visible');
+        }
+
+        async function generateSummary() {
+            const meetingGoal = meetingGoalInput.value.trim();
+            const attendees = attendeesInput.value.trim();
+            const duration = durationInput.value.trim();
+            const language = languageInput.value;
+            const notes = notesInput.value.trim();
+
+            if (!notes) {
+                showToast('Please enter meeting notes before generating summary.', 'error');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const response = await fetch(`${API_URL}/agenda/summary`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ meetingGoal, attendees, duration, language, notes })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.clear();
+                        window.location.href = 'index.html';
+                        return;
+                    }
+
+                    showToast(data.message || 'Failed to generate summary.', 'error');
+                    return;
+                }
+
+                showResults(data.data || {});
+                showToast('Summary generated successfully.', 'success');
+            } catch (error) {
+                showToast('Could not connect to server. Please try again.', 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function exportPdf() {
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                showToast('PDF library failed to load.', 'error');
+                return;
+            }
+
+            const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 48;
+            const maxWidth = pageWidth - margin * 2;
+            const headingColor = [20, 52, 100];
+            let y = margin;
+
+            function ensurePageSpace(linesNeeded) {
+                const needed = linesNeeded * 18;
+                if (y + needed > pageHeight - 72) {
+                    doc.addPage();
+                    y = margin;
+                }
+            }
+
+            function writeHeading(text) {
+                ensurePageSpace(2);
+                doc.setTextColor(...headingColor);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(16);
+                doc.text(text, margin, y);
+                y += 24;
+            }
+
+            function writeBodyLine(text) {
+                const lines = doc.splitTextToSize(text, maxWidth);
+                lines.forEach((line) => {
+                    ensurePageSpace(1);
+                    doc.setTextColor(25, 25, 25);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(12);
+                    doc.text(line, margin, y);
+                    y += 18;
+                });
+            }
+
+            const summary = summaryText.textContent.trim() || '-';
+            const decisions = Array.from(decisionsList.querySelectorAll('li')).map((li, i) => `${i + 1}. ${li.textContent.trim()}`);
+            const actions = Array.from(actionItemsBody.querySelectorAll('tr')).map((row) => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 4) {
+                    return row.textContent.trim();
+                }
+                return `Task: ${cells[1].textContent.trim()} | Assignee: ${cells[2].textContent.trim()} | Deadline: ${cells[3].textContent.trim()}`;
+            });
+            const topics = Array.from(topicsChips.querySelectorAll('.chip')).map((chip) => chip.textContent.trim());
+
+            doc.setTextColor(...headingColor);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.text('AI Meeting Assistant', margin, y);
+            y += 12;
+            doc.setDrawColor(20, 52, 100);
+            doc.setLineWidth(1);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 24;
+
+            writeHeading('MEETING DETAILS');
+            writeBodyLine(`Meeting Goal: ${meetingGoalInput.value.trim() || '-'}`);
+            writeBodyLine(`Attendees: ${attendeesInput.value.trim() || '-'}`);
+            writeBodyLine(`Duration: ${durationInput.value.trim() || '-'} minutes`);
+            writeBodyLine(`Date Generated: ${new Date().toLocaleDateString('en-CA')}`);
+            y += 10;
+
+            writeHeading('SUMMARY');
+            writeBodyLine(summary);
+            y += 8;
+
+            writeHeading('KEY DECISIONS');
+            if (decisions.length) {
+                decisions.forEach((line) => writeBodyLine(line));
+            } else {
+                writeBodyLine('No key decisions captured.');
+            }
+            y += 8;
+
+            writeHeading('ACTION ITEMS');
+            if (actions.length) {
+                actions.forEach((line, index) => writeBodyLine(`${index + 1}. ${line}`));
+            } else {
+                writeBodyLine('No action items captured.');
+            }
+            y += 8;
+
+            writeHeading('NEXT MEETING TOPICS');
+            if (topics.length) {
+                topics.forEach((topic, index) => writeBodyLine(`${index + 1}. ${topic}`));
+            } else {
+                writeBodyLine('No topics suggested.');
+            }
+
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setTextColor(90, 90, 90);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                doc.text('Generated by AI Meeting Assistant', margin, pageHeight - 28);
+                doc.text(`Page ${i}`, pageWidth - margin, pageHeight - 28, { align: 'right' });
+            }
+
+            const datePart = new Date().toLocaleDateString('en-CA');
+            doc.save(`Meeting_Summary_${datePart}.pdf`);
+        }
+
+        function initFromStorage() {
+            meetingGoalInput.value = getStoredValue('meetingGoal', 'No meeting goal found');
+            attendeesInput.value = getStoredValue('attendees', 'No attendees found');
+            durationInput.value = getStoredValue('duration', '');
+            updateCharCounter();
+        }
+
+        notesInput.addEventListener('input', updateCharCounter);
+        generateBtn.addEventListener('click', generateSummary);
+        exportPdfBtn.addEventListener('click', exportPdf);
+        backHomeBtn.addEventListener('click', function () {
+            window.location.href = 'main.html';
+        });
+
+        initFromStorage();
+    </script>
+    <script src="sidebar.js"></script>
+</body>
+</html>

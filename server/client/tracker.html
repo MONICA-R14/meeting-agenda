@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Action Item Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="sidebar.css" />
+    <style>
+        :root {
+            --sidebar-bg: #121417;
+            --sidebar-surface: rgba(255, 255, 255, 0.04);
+            --sidebar-border: rgba(255, 255, 255, 0.08);
+            --sidebar-text: #e8e2d9;
+            --sidebar-muted: #8a8f98;
+            --sidebar-accent: #c9a84c;
+            --sidebar-expanded-width: 220px;
+            --sidebar-collapsed-width: 60px;
+            --sidebar-active-bg: rgba(201, 168, 76, 0.12);
+            --bg: #0d0d1a;
+            --card-bg: #16213e;
+            --gold: #c9a84c;
+            --cyan: #00bcd4;
+            --green: #6cd98e;
+            --red: #ff4444;
+            --text: #e8e2d9;
+            --text-muted: #8a8f98;
+            --border: rgba(255,255,255,0.08);
+            --glow: rgba(201, 168, 76, 0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse, var(--glow), transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-expanded-width);
+            padding: 2.5rem 3rem;
+            max-width: none;
+            position: relative;
+            z-index: 1;
+            transition: margin-left 0.28s ease;
+        }
+
+        body.sidebar-collapsed .main-content {
+            margin-left: var(--sidebar-collapsed-width);
+        }
+
+        /* Header */
+        .page-header {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .page-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.2rem;
+            font-weight: 400;
+            color: var(--text);
+        }
+
+        .page-title-icon {
+            font-size: 2rem;
+            color: var(--gold);
+        }
+
+        .page-subtitle {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--gold);
+        }
+
+        .stat-card:hover {
+            border-color: var(--gold);
+            box-shadow: 0 0 20px rgba(201, 168, 76, 0.2);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gold);
+        }
+
+        .stat-card.completed::before {
+            background: var(--green);
+        }
+
+        .stat-card.completed {
+            border-left-color: var(--green);
+        }
+
+        .stat-card.pending::before {
+            background: var(--gold);
+        }
+
+        .stat-card.completion::before {
+            background: var(--cyan);
+        }
+
+        .stat-card.completion {
+            border-left-color: var(--cyan);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.8rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card.completed .stat-value {
+            color: var(--green);
+        }
+
+        .stat-card.pending .stat-value {
+            color: var(--gold);
+        }
+
+        .stat-card.completion .stat-value {
+            color: var(--cyan);
+        }
+
+        /* Progress ring for completion */
+        .progress-ring-container {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            margin-top: 0.5rem;
+        }
+
+        .progress-ring {
+            width: 100%;
+            height: 100%;
+        }
+
+        .progress-ring-circle {
+            fill: none;
+            stroke: rgba(0, 188, 212, 0.2);
+            stroke-width: 4;
+            stroke-dasharray: 282.7;
+            stroke-dashoffset: 282.7;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .progress-ring-circle.filled {
+            stroke: var(--cyan);
+        }
+
+        /* Filter Row */
+        .filter-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.75rem 1rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.9rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 12px rgba(201, 168, 76, 0.2);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .filter-btn {
+            padding: 0.65rem 1.2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .filter-btn.active {
+            background: rgba(201, 168, 76, 0.2);
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .sort-dropdown {
+            padding: 0.65rem 1rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+        }
+
+        .sort-dropdown:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .sort-dropdown option {
+            background: var(--card-bg);
+            color: var(--text);
+        }
+
+        /* Main Content */
+        .tasks-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .group-header {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            margin-top: 1.5rem;
+        }
+
+        .group-header:first-child {
+            margin-top: 0;
+        }
+
+        .group-header:hover {
+            color: var(--gold);
+        }
+
+        .group-toggle {
+            font-size: 1.2rem;
+            transition: transform 0.2s ease;
+            color: var(--gold);
+        }
+
+        .group-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .group-title {
+            font-size: 1.1rem;
+            color: var(--gold);
+            font-weight: 500;
+        }
+
+        .group-date {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .group-items {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding-left: 1rem;
+        }
+
+        .group-items.collapsed {
+            display: none;
+        }
+
+        /* Task Cards */
+        .task-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--gold);
+        }
+
+        .task-card:hover {
+            box-shadow: 0 0 20px rgba(201, 168, 76, 0.15);
+        }
+
+        .task-card.completed {
+            border-left-color: var(--green);
+            opacity: 0.7;
+        }
+
+        .task-card.completed .task-text {
+            text-decoration: line-through;
+        }
+
+        /* Checkbox */
+        .task-checkbox {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border: 2px solid var(--gold);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            margin-top: 0.2rem;
+        }
+
+        .task-card.completed .task-checkbox {
+            background: var(--green);
+            border-color: var(--green);
+        }
+
+        .task-checkbox::after {
+            content: '✓';
+            color: var(--bg);
+            font-size: 1.2rem;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .task-card.completed .task-checkbox::after {
+            opacity: 1;
+        }
+
+        /* Task Content */
+        .task-content {
+            flex: 1;
+        }
+
+        .task-text {
+            font-size: 1rem;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .task-meta {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.5rem;
+        }
+
+        .meta-item {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .meta-item.assignee {
+            color: var(--gold);
+        }
+
+        .task-dates {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Task Status */
+        .task-status {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.5rem;
+        }
+
+        .status-badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        .status-pending {
+            background: rgba(201, 168, 76, 0.2);
+            color: var(--gold);
+        }
+
+        .status-completed {
+            background: rgba(108, 217, 142, 0.2);
+            color: var(--green);
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.6;
+        }
+
+        .empty-title {
+            font-size: 1.5rem;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-text {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            max-width: 400px;
+        }
+
+        .empty-btn {
+            padding: 0.8rem 2rem;
+            background: var(--gold);
+            color: var(--bg);
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .empty-btn:hover {
+            background: #d4b861;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: var(--card-bg);
+            color: var(--text);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--gold);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease, slideOut 0.3s ease 3.7s;
+            z-index: 2000;
+        }
+
+        .toast.success {
+            border-left-color: var(--green);
+        }
+
+        .toast.error {
+            border-left-color: var(--red);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(400px); opacity: 0; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1.5rem;
+            }
+
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filter-row {
+                flex-direction: column;
+            }
+
+            .search-input {
+                min-width: auto;
+            }
+
+            .task-card {
+                flex-direction: column;
+            }
+
+            .task-status {
+                flex-direction: row;
+                align-items: center;
+            }
+
+            .page-title {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Menu</div>
+            <button id="sidebar-toggle" class="sidebar-toggle">☰</button>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="main.html" class="sidebar-link" data-page="main.html">
+                <span>📝</span>
+                <span>Agenda Builder</span>
+            </a>
+            <a href="summary.html" class="sidebar-link" data-page="summary.html">
+                <span>📋</span>
+                <span>Summary</span>
+            </a>
+            <a href="tracker.html" class="sidebar-link" data-page="tracker.html">
+                <span>✅</span>
+                <span>Action Tracker</span>
+            </a>
+            <a href="teams.html" class="sidebar-link" data-page="teams.html">
+                <span>👥</span>
+                <span>Teams</span>
+            </a>
+            <a href="schedule.html" class="sidebar-link" data-page="schedule.html">
+                <span>📅</span>
+                <span>Schedule</span>
+            </a>
+            <a href="timer.html" class="sidebar-link" data-page="timer.html">
+                <span>⏱️</span>
+                <span>Timer</span>
+            </a>
+            <a href="attendance.html" class="sidebar-link" data-page="attendance.html">
+                <span>📊</span>
+                <span>Attendance</span>
+            </a>
+            <a href="admin.html" class="sidebar-link" data-page="admin.html">
+                <span>⚙️</span>
+                <span>Admin</span>
+            </a>
+        </nav>
+        <div style="padding: 1rem 0.8rem; border-top: 1px solid var(--sidebar-border);">
+            <div class="sidebar-link" id="sidebar-user-name" style="flex: 1; border-left: none; cursor: default;">
+                👤 Guest User
+            </div>
+            <a href="#" id="sidebar-logout" class="sidebar-link" style="color: var(--sidebar-muted); margin-top: 0.5rem;">
+                🚪 Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <span class="page-title-icon">✅</span>
+            <h1 class="page-title">Action Item Tracker</h1>
+        </div>
+        <p class="page-subtitle">Track tasks assigned from your meetings</p>
+
+        <!-- Stats Row -->
+        <div class="stats-row" id="statsRow">
+            <div class="stat-card">
+                <div class="stat-label">Total Tasks</div>
+                <div class="stat-value" id="totalTasks">0</div>
+            </div>
+            <div class="stat-card completed">
+                <div class="stat-label">Completed</div>
+                <div class="stat-value" id="completedTasks">0</div>
+            </div>
+            <div class="stat-card pending">
+                <div class="stat-label">Pending</div>
+                <div class="stat-value" id="pendingTasks">0</div>
+            </div>
+            <div class="stat-card completion">
+                <div class="stat-label">Completion %</div>
+                <div class="stat-value" id="completionPct">0%</div>
+                <svg class="progress-ring" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" class="progress-ring-circle" id="progressRing"></circle>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Filter Row -->
+        <div class="filter-row">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search by task or assignee...">
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="pending">Pending</button>
+                <button class="filter-btn" data-filter="completed">Completed</button>
+            </div>
+            <select class="sort-dropdown" id="sortDropdown">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="assignee">By Assignee</option>
+            </select>
+        </div>
+
+        <!-- Tasks Container -->
+        <div class="tasks-container" id="tasksContainer">
+            <!-- Loaded dynamically -->
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="sidebar.js"></script>
+    <script>
+        // State
+        let allActionItems = [];
+        let allMeetings = {};
+        let currentFilter = 'all';
+        let currentSort = 'newest';
+        let currentSearch = '';
+
+        // Check token
+        function checkToken() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Format date
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/actionitems/stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatsDisplay(data.data);
+                }
+            } catch (err) {
+                console.error('Error loading stats:', err);
+            }
+        }
+
+        // Update stats display
+        function updateStatsDisplay(stats) {
+            document.getElementById('totalTasks').textContent = stats.total;
+            document.getElementById('completedTasks').textContent = stats.completed;
+            document.getElementById('pendingTasks').textContent = stats.pending;
+            document.getElementById('completionPct').textContent = stats.percentage + '%';
+
+            // Update progress ring
+            const circumference = 2 * Math.PI * 45;
+            const offset = circumference - (stats.percentage / 100) * circumference;
+            const ring = document.getElementById('progressRing');
+            ring.style.strokeDasharray = circumference;
+            ring.style.strokeDashoffset = offset;
+        }
+
+        // Load action items
+        async function loadActionItems() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/actionitems', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    allActionItems = data.data || [];
+                    groupAndRenderItems();
+                } else {
+                    renderEmptyState();
+                }
+            } catch (err) {
+                console.error('Error loading action items:', err);
+                renderEmptyState();
+            }
+        }
+
+        // Group items by meeting
+        function groupAndRenderItems() {
+            const grouped = {};
+            
+            allActionItems.forEach(item => {
+                const meetingKey = item.meetingId;
+                if (!grouped[meetingKey]) {
+                    grouped[meetingKey] = {
+                        meetingId: item.meetingId,
+                        meetingGoal: item.meetingGoal,
+                        meetingDate: item.meetingDate,
+                        items: []
+                    };
+                }
+                grouped[meetingKey].items.push(item);
+            });
+
+            allMeetings = grouped;
+            renderItems();
+        }
+
+        // Filter and render items
+        function renderItems() {
+            const container = document.getElementById('tasksContainer');
+            
+            if (Object.keys(allMeetings).length === 0) {
+                renderEmptyState();
+                return;
+            }
+
+            let filteredItems = [];
+
+            // Apply filter
+            Object.values(allMeetings).forEach(group => {
+                group.items.forEach(item => {
+                    if (currentFilter === 'all') {
+                        filteredItems.push(item);
+                    } else if (currentFilter === 'pending' && !item.completed) {
+                        filteredItems.push(item);
+                    } else if (currentFilter === 'completed' && item.completed) {
+                        filteredItems.push(item);
+                    }
+                });
+            });
+
+            // Apply search
+            if (currentSearch) {
+                filteredItems = filteredItems.filter(item =>
+                    item.task.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                    item.assignee.toLowerCase().includes(currentSearch.toLowerCase())
+                );
+            }
+
+            // Apply sort
+            if (currentSort === 'newest') {
+                filteredItems.sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate));
+            } else if (currentSort === 'oldest') {
+                filteredItems.sort((a, b) => new Date(a.meetingDate) - new Date(b.meetingDate));
+            } else if (currentSort === 'assignee') {
+                filteredItems.sort((a, b) => a.assignee.localeCompare(b.assignee));
+            }
+
+            // Group by meeting again for display
+            const displayGroups = {};
+            filteredItems.forEach(item => {
+                const meetingKey = item.meetingId;
+                if (!displayGroups[meetingKey]) {
+                    displayGroups[meetingKey] = {
+                        meetingGoal: item.meetingGoal,
+                        meetingDate: item.meetingDate,
+                        items: []
+                    };
+                }
+                displayGroups[meetingKey].items.push(item);
+            });
+
+            if (filteredItems.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <div class="empty-title">No items match your search</div>
+                        <div class="empty-text">Try adjusting your filters or search terms</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Render groups
+            container.innerHTML = '';
+            Object.values(displayGroups).forEach(group => {
+                const groupHeader = document.createElement('div');
+                groupHeader.className = 'group-header';
+                groupHeader.innerHTML = `
+                    <span class="group-toggle">▼</span>
+                    <span class="group-title">${group.meetingGoal}</span>
+                    <span class="group-date">${formatDate(group.meetingDate)}</span>
+                `;
+
+                const groupItems = document.createElement('div');
+                groupItems.className = 'group-items';
+
+                groupHeader.addEventListener('click', () => {
+                    groupHeader.querySelector('.group-toggle').classList.toggle('collapsed');
+                    groupItems.classList.toggle('collapsed');
+                });
+
+                group.items.forEach(item => {
+                    const card = createTaskCard(item);
+                    groupItems.appendChild(card);
+                });
+
+                container.appendChild(groupHeader);
+                container.appendChild(groupItems);
+            });
+        }
+
+        // Create task card
+        function createTaskCard(item) {
+            const card = document.createElement('div');
+            card.className = `task-card ${item.completed ? 'completed' : ''}`;
+            card.innerHTML = `
+                <div class="task-checkbox"></div>
+                <div class="task-content">
+                    <div class="task-text">${escapeHtml(item.task)}</div>
+                    <div class="task-meta">
+                        <span class="meta-item assignee">👤 ${escapeHtml(item.assignee)}</span>
+                        <span class="meta-item">📅 ${formatDate(item.deadline)}</span>
+                    </div>
+                    <div class="task-dates">
+                        <span>From: ${formatDate(item.meetingDate)}</span>
+                    </div>
+                </div>
+                <div class="task-status">
+                    <span class="status-badge ${item.completed ? 'status-completed' : 'status-pending'}">
+                        ${item.completed ? 'Completed' : 'Pending'}
+                    </span>
+                </div>
+            `;
+
+            const checkbox = card.querySelector('.task-checkbox');
+            checkbox.addEventListener('click', async () => {
+                await toggleComplete(item, card);
+            });
+
+            return card;
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Toggle complete
+        async function toggleComplete(item, card) {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(
+                    `/api/actionitems/${item.meetingId}/${item._id}`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ completed: !item.completed })
+                    }
+                );
+
+                if (response.ok) {
+                    item.completed = !item.completed;
+                    card.classList.toggle('completed');
+                    
+                    const statusBadge = card.querySelector('.status-badge');
+                    statusBadge.textContent = item.completed ? 'Completed' : 'Pending';
+                    statusBadge.className = `status-badge ${item.completed ? 'status-completed' : 'status-pending'}`;
+
+                    showToast(
+                        item.completed ? 'Task marked complete ✅' : 'Task marked pending',
+                        'success'
+                    );
+                    
+                    loadStats();
+                } else {
+                    showToast('Failed to update task', 'error');
+                }
+            } catch (err) {
+                console.error('Error toggling complete:', err);
+                showToast('Error updating task', 'error');
+            }
+        }
+
+        // Show toast
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        // Render empty state
+        function renderEmptyState() {
+            const container = document.getElementById('tasksContainer');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">✅</div>
+                    <div class="empty-title">No action items yet</div>
+                    <div class="empty-text">Generate a meeting summary to create action items</div>
+                    <a href="summary.html"><button class="empty-btn">Go to Summary</button></a>
+                </div>
+            `;
+        }
+
+        // Event listeners
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                renderItems();
+            });
+        });
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            currentSearch = e.target.value;
+            renderItems();
+        });
+
+        document.getElementById('sortDropdown').addEventListener('change', (e) => {
+            currentSort = e.target.value;
+            renderItems();
+        });
+
+        // Initial load
+        window.addEventListener('load', () => {
+            checkToken();
+            loadStats();
+            loadActionItems();
+        });
+    </script>
+</body>
+</html>

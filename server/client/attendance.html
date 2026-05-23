@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attendance Tracking | Agenda Builder</title>
+    <link rel="stylesheet" href="sidebar.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0d0d1a;
+            --card: #16213e;
+            --gold: #c9a84c;
+            --cyan: #00bcd4;
+            --danger: #ff4444;
+            --success: #2ecc71;
+            --pending: #7f8c8d;
+            --text: #eef4ff;
+            --muted: #9fb3cf;
+            --border: rgba(255, 255, 255, 0.12);
+            --row-odd: rgba(255, 255, 255, 0.03);
+            --row-even: rgba(255, 255, 255, 0.06);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background:
+                radial-gradient(circle at 15% 10%, rgba(0, 188, 212, 0.13), transparent 35%),
+                radial-gradient(circle at 90% 85%, rgba(201, 168, 76, 0.2), transparent 30%),
+                var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .app-shell {
+            min-height: 100vh;
+            padding: 28px;
+        }
+
+        .page-header {
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-title-icon { color: var(--gold); }
+
+        .page-subtitle {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 0.98rem;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(320px, 35%) minmax(0, 65%);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        }
+
+        .panel-title {
+            color: var(--gold);
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+
+        .meeting-search {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            color: var(--text);
+            outline: none;
+            margin-bottom: 12px;
+        }
+
+        .meeting-search:focus {
+            border-color: var(--cyan);
+            box-shadow: 0 0 0 2px rgba(0, 188, 212, 0.2);
+        }
+
+        .meeting-list {
+            max-height: 68vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 4px;
+        }
+
+        .meeting-card {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .meeting-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(0, 188, 212, 0.65);
+            background: rgba(0, 188, 212, 0.06);
+        }
+
+        .meeting-card.active {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.2);
+            background: rgba(201, 168, 76, 0.1);
+        }
+
+        .meeting-card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .meeting-meta {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .meeting-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .badge.scheduled { background: rgba(0, 188, 212, 0.18); color: var(--cyan); }
+        .badge.completed { background: rgba(46, 204, 113, 0.18); color: #6ef0a1; }
+        .badge.cancelled { background: rgba(255, 68, 68, 0.2); color: var(--danger); }
+
+        .member-count {
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
+        .report-panel {
+            min-height: 70vh;
+            position: relative;
+        }
+
+        .empty-state {
+            min-height: 56vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            text-align: center;
+            gap: 10px;
+        }
+
+        .empty-icon {
+            font-size: 4.2rem;
+            color: var(--gold);
+        }
+
+        .report-content {
+            display: none;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .report-content.visible {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .meeting-heading {
+            font-size: 1.4rem;
+            margin-bottom: 8px;
+            color: var(--gold);
+        }
+
+        .meeting-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 18px;
+            color: var(--muted);
+            margin-bottom: 16px;
+            font-size: 0.92rem;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-top: 4px solid transparent;
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 0.78rem;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .stat-total { border-top-color: var(--cyan); }
+        .stat-total .stat-value { color: var(--cyan); }
+
+        .stat-joined { border-top-color: var(--success); }
+        .stat-joined .stat-value { color: var(--success); }
+
+        .stat-absent { border-top-color: var(--danger); }
+        .stat-absent .stat-value { color: var(--danger); }
+
+        .stat-percentage { border-top-color: var(--gold); }
+        .stat-percentage .stat-value { color: var(--gold); }
+
+        .table-wrap {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .table-toolbar {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.2);
+            color: var(--muted);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: capitalize;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-chip:hover {
+            border-color: rgba(0, 188, 212, 0.6);
+            color: #8deefa;
+        }
+
+        .filter-chip.active {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: rgba(201, 168, 76, 0.16);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+        }
+
+        thead tr { background: rgba(0, 0, 0, 0.35); }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr:nth-child(odd) { background: var(--row-odd); }
+        tbody tr:nth-child(even) { background: var(--row-even); }
+
+        tbody tr:last-child td { border-bottom: none; }
+
+        .status-pill {
+            border-radius: 999px;
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            font-weight: 700;
+            text-transform: capitalize;
+            display: inline-flex;
+        }
+
+        .status-pill.joined { background: rgba(46, 204, 113, 0.22); color: #7ff2ac; }
+        .status-pill.absent { background: rgba(255, 68, 68, 0.24); color: #ff8a8a; }
+        .status-pill.pending { background: rgba(127, 140, 141, 0.35); color: #d7dfdf; }
+
+        .status-select {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 8px;
+            padding: 6px;
+            outline: none;
+        }
+
+        .status-select:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .bottom-actions {
+            margin-top: 16px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
+        }
+
+        .btn:hover { transform: translateY(-1px); }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-gold {
+            background: var(--gold);
+            color: #11142a;
+        }
+
+        .btn-secondary {
+            background: rgba(0, 188, 212, 0.12);
+            border-color: rgba(0, 188, 212, 0.5);
+            color: #8deefa;
+        }
+
+        .initialize-wrap {
+            margin: 18px 0;
+            display: none;
+        }
+
+        .initialize-wrap.visible {
+            display: block;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(13, 13, 26, 0.75);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            z-index: 8;
+        }
+
+        .loading-overlay.visible { display: flex; }
+
+        .spinner {
+            width: 42px;
+            height: 42px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 0.85s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toast-container {
+            position: fixed;
+            top: 18px;
+            right: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1200;
+        }
+
+        .toast {
+            min-width: 220px;
+            max-width: 320px;
+            padding: 12px;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 0.9rem;
+            animation: slideIn 0.2s ease;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+        }
+
+        .toast.success { background: rgba(46, 204, 113, 0.95); }
+        .toast.error { background: rgba(255, 68, 68, 0.95); }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(16px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .list-empty {
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        @media (max-width: 1200px) {
+            .stats-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 980px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .meeting-list {
+                max-height: 300px;
+            }
+
+            .report-panel {
+                min-height: 60vh;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .app-shell {
+                padding: 16px;
+            }
+
+            .page-title {
+                font-size: 1.5rem;
+            }
+
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+
+            th, td {
+                padding: 10px 8px;
+                font-size: 0.82rem;
+            }
+
+            .bottom-actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Agenda Builder</div>
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+        </div>
+        <nav class="sidebar-nav">
+            <a class="sidebar-link" href="main.html" data-page="main.html"><span class="sidebar-icon">🏠</span><span class="sidebar-label">Home</span></a>
+            <a class="sidebar-link" href="calendar.html" data-page="calendar.html"><span class="sidebar-icon">📅</span><span class="sidebar-label">Calendar</span></a>
+            <a class="sidebar-link" href="timer.html" data-page="timer.html"><span class="sidebar-icon">⏱️</span><span class="sidebar-label">Meeting Timer</span></a>
+            <a class="sidebar-link" href="summary.html" data-page="summary.html"><span class="sidebar-icon">📝</span><span class="sidebar-label">Summary</span></a>
+            <a class="sidebar-link" href="teams.html" data-page="teams.html"><span class="sidebar-icon">👥</span><span class="sidebar-label">Teams</span></a>
+            <a class="sidebar-link" href="tracker.html" data-page="attendance.html"><span class="sidebar-icon">✅</span><span class="sidebar-label">Action Tracker</span></a>
+            <a class="sidebar-link" href="attendance.html"><span class="sidebar-icon">📊</span><span class="sidebar-label">Attendance</span></a>
+            <a class="sidebar-link" href="admin.html" data-page="admin.html"><span class="sidebar-icon">⚙️</span><span class="sidebar-label">Admin Panel</span></a>
+            <a class="sidebar-link" href="#" id="sidebar-logout"><span class="sidebar-icon">🚪</span><span class="sidebar-label">Logout</span></a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <span class="sidebar-icon">👤</span>
+                <span class="sidebar-user-name" id="sidebar-user-name">Guest User</span>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-shell">
+        <main>
+            <div class="page-header">
+                <h1 class="page-title"><span class="page-title-icon">📊</span>Attendance Tracking</h1>
+                <p class="page-subtitle">Track who joined and who missed your meetings</p>
+            </div>
+
+            <div class="layout">
+                <section class="panel">
+                    <h2 class="panel-title">Select Meeting</h2>
+                    <input id="meetingSearch" class="meeting-search" type="text" placeholder="Search meetings by title..." />
+                    <div id="meetingList" class="meeting-list"></div>
+                </section>
+
+                <section class="panel report-panel">
+                    <div id="reportLoader" class="loading-overlay">
+                        <div class="spinner" aria-label="Loading"></div>
+                    </div>
+
+                    <div id="emptyState" class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <h3>Select a meeting to view attendance</h3>
+                    </div>
+
+                    <div id="reportContent" class="report-content">
+                        <h2 id="meetingHeading" class="meeting-heading"></h2>
+                        <div class="meeting-details">
+                            <span id="detailDate"></span>
+                            <span id="detailDuration"></span>
+                            <span id="detailTeam"></span>
+                        </div>
+
+                        <div id="initializeWrap" class="initialize-wrap">
+                            <button id="initializeBtn" class="btn btn-secondary" type="button">Initialize Attendance</button>
+                        </div>
+
+                        <div id="statsRow" class="stats-row" style="display: none;">
+                            <div class="stat-card stat-total">
+                                <div class="stat-label">Total Attendees</div>
+                                <div id="statTotal" class="stat-value">0</div>
+                            </div>
+                            <div class="stat-card stat-joined">
+                                <div class="stat-label">Joined</div>
+                                <div id="statJoined" class="stat-value">0</div>
+                            </div>
+                            <div class="stat-card stat-absent">
+                                <div class="stat-label">Absent</div>
+                                <div id="statAbsent" class="stat-value">0</div>
+                            </div>
+                            <div class="stat-card stat-percentage">
+                                <div class="stat-label">Attendance %</div>
+                                <div id="statPercentage" class="stat-value">0%</div>
+                            </div>
+                        </div>
+
+                        <div id="tableToolbar" class="table-toolbar" style="display: none;">
+                            <button class="filter-chip active" type="button" data-status-filter="all">all</button>
+                            <button class="filter-chip" type="button" data-status-filter="joined">joined</button>
+                            <button class="filter-chip" type="button" data-status-filter="absent">absent</button>
+                            <button class="filter-chip" type="button" data-status-filter="pending">pending</button>
+                        </div>
+
+                        <div id="attendanceTableWrap" class="table-wrap" style="display: none;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                        <th>Joined At</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendanceBody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="bottom-actions">
+                            <button id="finalizeBtn" class="btn btn-gold" type="button" disabled>Finalize Attendance</button>
+                            <button id="exportBtn" class="btn btn-secondary" type="button" disabled>Export Attendance PDF</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script>
+        (function () {
+            var token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            var state = {
+                meetings: [],
+                filteredMeetings: [],
+                selectedMeeting: null,
+                attendanceRows: [],
+                attendanceLoaded: false,
+                attendanceStatusFilter: 'all'
+            };
+
+            var dom = {
+                meetingSearch: document.getElementById('meetingSearch'),
+                meetingList: document.getElementById('meetingList'),
+                reportLoader: document.getElementById('reportLoader'),
+                emptyState: document.getElementById('emptyState'),
+                reportContent: document.getElementById('reportContent'),
+                meetingHeading: document.getElementById('meetingHeading'),
+                detailDate: document.getElementById('detailDate'),
+                detailDuration: document.getElementById('detailDuration'),
+                detailTeam: document.getElementById('detailTeam'),
+                initializeWrap: document.getElementById('initializeWrap'),
+                initializeBtn: document.getElementById('initializeBtn'),
+                statsRow: document.getElementById('statsRow'),
+                statTotal: document.getElementById('statTotal'),
+                statJoined: document.getElementById('statJoined'),
+                statAbsent: document.getElementById('statAbsent'),
+                statPercentage: document.getElementById('statPercentage'),
+                tableToolbar: document.getElementById('tableToolbar'),
+                attendanceTableWrap: document.getElementById('attendanceTableWrap'),
+                attendanceBody: document.getElementById('attendanceBody'),
+                finalizeBtn: document.getElementById('finalizeBtn'),
+                exportBtn: document.getElementById('exportBtn'),
+                toastContainer: document.getElementById('toastContainer')
+            };
+
+            function showToast(message, type) {
+                var toast = document.createElement('div');
+                toast.className = 'toast ' + (type || 'success');
+                toast.textContent = message;
+                dom.toastContainer.appendChild(toast);
+                window.setTimeout(function () {
+                    toast.remove();
+                }, 3000);
+            }
+
+            function formatDateTime(value) {
+                if (!value) return '-';
+                var date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '-';
+                return date.toLocaleString();
+            }
+
+            function formatTime(value) {
+                if (!value) return '-';
+                var date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '-';
+                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            function toggleLoading(show) {
+                dom.reportLoader.classList.toggle('visible', Boolean(show));
+            }
+
+            async function apiFetch(url, options) {
+                var config = options || {};
+                var headers = config.headers || {};
+                headers.Authorization = 'Bearer ' + token;
+                if (!(config.body instanceof FormData)) {
+                    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+                }
+                config.headers = headers;
+
+                var response = await fetch(url, config);
+                var data;
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    data = {};
+                }
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Request failed');
+                }
+
+                return data;
+            }
+
+            function statusBadge(status) {
+                var normalized = status || 'pending';
+                return '<span class="status-pill ' + normalized + '">' + normalized + '</span>';
+            }
+
+            function meetingBadge(status) {
+                var normalized = (status || 'scheduled').toLowerCase();
+                return '<span class="badge ' + normalized + '">' + normalized + '</span>';
+            }
+
+            function computeStats(rows) {
+                var total = rows.length;
+                var joined = rows.filter(function (row) { return row.status === 'joined'; }).length;
+                var absent = rows.filter(function (row) { return row.status === 'absent'; }).length;
+                var percent = total > 0 ? Math.round((joined / total) * 100) : 0;
+
+                return {
+                    total: total,
+                    joined: joined,
+                    absent: absent,
+                    percentage: percent
+                };
+            }
+
+            function renderStats(rows) {
+                var stats = computeStats(rows);
+                dom.statTotal.textContent = String(stats.total);
+                dom.statJoined.textContent = String(stats.joined);
+                dom.statAbsent.textContent = String(stats.absent);
+                dom.statPercentage.textContent = String(stats.percentage) + '%';
+            }
+
+            function renderAttendanceTable() {
+                dom.attendanceBody.innerHTML = '';
+
+                var rowsToDisplay = state.attendanceRows;
+                if (state.attendanceStatusFilter !== 'all') {
+                    rowsToDisplay = state.attendanceRows.filter(function (row) {
+                        return row.status === state.attendanceStatusFilter;
+                    });
+                }
+
+                rowsToDisplay.forEach(function (row) {
+                    var tr = document.createElement('tr');
+                    tr.dataset.email = row.email;
+
+                    var actionDisabled = state.selectedMeeting && state.selectedMeeting.attendanceFinalized;
+                    tr.innerHTML = '' +
+                        '<td>' + (row.name || '-') + '</td>' +
+                        '<td>' + (row.email || '-') + '</td>' +
+                        '<td>' + statusBadge(row.status) + '</td>' +
+                        '<td>' + formatTime(row.joinedAt) + '</td>' +
+                        '<td>' +
+                        '  <select class="status-select" ' + (actionDisabled ? 'disabled' : '') + ' data-email="' + (row.email || '') + '">' +
+                        '    <option value="joined" ' + (row.status === 'joined' ? 'selected' : '') + '>joined</option>' +
+                        '    <option value="absent" ' + (row.status === 'absent' ? 'selected' : '') + '>absent</option>' +
+                        '    <option value="pending" ' + (row.status === 'pending' ? 'selected' : '') + '>pending</option>' +
+                        '  </select>' +
+                        '</td>';
+
+                    dom.attendanceBody.appendChild(tr);
+                });
+
+                dom.attendanceTableWrap.style.display = rowsToDisplay.length ? 'block' : 'none';
+                dom.tableToolbar.style.display = state.attendanceRows.length ? 'flex' : 'none';
+                dom.statsRow.style.display = state.attendanceRows.length ? 'grid' : 'none';
+                dom.exportBtn.disabled = !state.attendanceRows.length;
+
+                renderStats(state.attendanceRows);
+            }
+
+            function setAttendanceFilter(filterValue) {
+                state.attendanceStatusFilter = filterValue || 'all';
+
+                var chips = dom.tableToolbar.querySelectorAll('.filter-chip[data-status-filter]');
+                chips.forEach(function (chip) {
+                    var isActive = chip.getAttribute('data-status-filter') === state.attendanceStatusFilter;
+                    chip.classList.toggle('active', isActive);
+                });
+
+                renderAttendanceTable();
+            }
+
+            function renderMeetingList() {
+                dom.meetingList.innerHTML = '';
+
+                if (!state.filteredMeetings.length) {
+                    var empty = document.createElement('div');
+                    empty.className = 'list-empty';
+                    empty.textContent = 'No meetings found.';
+                    dom.meetingList.appendChild(empty);
+                    return;
+                }
+
+                state.filteredMeetings.forEach(function (meeting) {
+                    var card = document.createElement('article');
+                    card.className = 'meeting-card' + (state.selectedMeeting && state.selectedMeeting._id === meeting._id ? ' active' : '');
+                    card.dataset.id = meeting._id;
+                    card.innerHTML = '' +
+                        '<div class="meeting-card-title">' + (meeting.title || 'Untitled Meeting') + '</div>' +
+                        '<div class="meeting-meta">' + formatDateTime(meeting.date) + '</div>' +
+                        '<div class="meeting-footer">' +
+                        meetingBadge(meeting.status) +
+                        '<span class="member-count">' + String((meeting.attendees || []).length) + ' members</span>' +
+                        '</div>';
+                    dom.meetingList.appendChild(card);
+                });
+            }
+
+            function applySearchFilter() {
+                var q = (dom.meetingSearch.value || '').trim().toLowerCase();
+                state.filteredMeetings = state.meetings.filter(function (meeting) {
+                    return (meeting.title || '').toLowerCase().indexOf(q) !== -1;
+                });
+                renderMeetingList();
+            }
+
+            function renderMeetingDetails() {
+                if (!state.selectedMeeting) {
+                    dom.emptyState.style.display = 'flex';
+                    dom.reportContent.classList.remove('visible');
+                    dom.reportContent.style.display = 'none';
+                    return;
+                }
+
+                dom.emptyState.style.display = 'none';
+                dom.reportContent.style.display = 'block';
+                requestAnimationFrame(function () {
+                    dom.reportContent.classList.add('visible');
+                });
+
+                dom.meetingHeading.textContent = state.selectedMeeting.title || 'Untitled Meeting';
+                dom.detailDate.textContent = 'Date: ' + formatDateTime(state.selectedMeeting.date);
+                dom.detailDuration.textContent = 'Duration: ' + String(state.selectedMeeting.duration || 0) + ' mins';
+                dom.detailTeam.textContent = 'Team: ' + ((state.selectedMeeting.teamId && state.selectedMeeting.teamId.name) || 'Not Assigned');
+            }
+
+            function toggleActionButtons() {
+                var disabled = !state.attendanceRows.length || (state.selectedMeeting && state.selectedMeeting.attendanceFinalized);
+                dom.finalizeBtn.disabled = Boolean(disabled);
+            }
+
+            async function loadMeetings() {
+                toggleLoading(true);
+                try {
+                    var payload = await apiFetch('/api/schedule');
+                    state.meetings = (payload.data || []).slice().sort(function (a, b) {
+                        return new Date(b.date).getTime() - new Date(a.date).getTime();
+                    });
+                    state.filteredMeetings = state.meetings.slice();
+                    renderMeetingList();
+                } catch (error) {
+                    showToast(error.message || 'Failed to load meetings', 'error');
+                } finally {
+                    toggleLoading(false);
+                }
+            }
+
+            async function loadAttendance(scheduleId) {
+                toggleLoading(true);
+                try {
+                    var payload = await apiFetch('/api/attendance/' + encodeURIComponent(scheduleId));
+                    var data = payload.data || {};
+                    state.attendanceRows = Array.isArray(data.attendance) ? data.attendance : [];
+                    state.attendanceLoaded = true;
+                    state.attendanceStatusFilter = 'all';
+
+                    dom.initializeWrap.classList.toggle('visible', state.attendanceRows.length === 0);
+
+                    renderAttendanceTable();
+                    toggleActionButtons();
+                } catch (error) {
+                    showToast(error.message || 'Failed to load attendance', 'error');
+                } finally {
+                    toggleLoading(false);
+                }
+            }
+
+            async function initializeAttendance() {
+                if (!state.selectedMeeting) return;
+                toggleLoading(true);
+                try {
+                    await apiFetch('/api/attendance/init/' + encodeURIComponent(state.selectedMeeting._id), {
+                        method: 'POST'
+                    });
+                    showToast('Attendance initialized', 'success');
+                    await loadAttendance(state.selectedMeeting._id);
+                } catch (error) {
+                    showToast(error.message || 'Failed to initialize attendance', 'error');
+                } finally {
+                    toggleLoading(false);
+                }
+            }
+
+            async function updateManualStatus(email, status) {
+                if (!state.selectedMeeting || !email) return;
+                try {
+                    await apiFetch('/api/attendance/' + encodeURIComponent(state.selectedMeeting._id) + '/manual', {
+                        method: 'PUT',
+                        body: JSON.stringify({ email: email, status: status })
+                    });
+
+                    state.attendanceRows = state.attendanceRows.map(function (row) {
+                        if (row.email !== email) return row;
+                        var next = Object.assign({}, row, { status: status });
+                        if (status === 'joined') {
+                            next.joinedAt = new Date().toISOString();
+                        }
+                        if (status !== 'joined') {
+                            next.joinedAt = null;
+                        }
+                        return next;
+                    });
+
+                    renderAttendanceTable();
+                    toggleActionButtons();
+                    showToast('Attendance updated', 'success');
+                } catch (error) {
+                    showToast(error.message || 'Failed to update status', 'error');
+                }
+            }
+
+            async function finalizeAttendance() {
+                if (!state.selectedMeeting) return;
+                var shouldProceed = window.confirm('This will mark all pending as absent. Continue?');
+                if (!shouldProceed) return;
+
+                toggleLoading(true);
+                try {
+                    var payload = await apiFetch('/api/attendance/' + encodeURIComponent(state.selectedMeeting._id) + '/finalize', {
+                        method: 'PUT'
+                    });
+
+                    state.attendanceRows = payload.data || state.attendanceRows;
+                    state.selectedMeeting.attendanceFinalized = true;
+                    state.selectedMeeting.status = 'completed';
+                    renderMeetingList();
+                    dom.initializeWrap.classList.remove('visible');
+                    renderAttendanceTable();
+                    toggleActionButtons();
+                    showToast('Attendance finalized successfully', 'success');
+                } catch (error) {
+                    showToast(error.message || 'Failed to finalize attendance', 'error');
+                } finally {
+                    toggleLoading(false);
+                }
+            }
+
+            function exportAttendancePdf() {
+                if (!state.selectedMeeting || !state.attendanceRows.length) {
+                    showToast('No attendance data to export', 'error');
+                    return;
+                }
+
+                var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+                if (!jsPDFCtor) {
+                    showToast('PDF library not loaded', 'error');
+                    return;
+                }
+
+                var doc = new jsPDFCtor();
+                var stats = computeStats(state.attendanceRows);
+                var y = 14;
+
+                doc.setFontSize(16);
+                doc.text('Attendance Report', 14, y);
+                y += 10;
+
+                doc.setFontSize(11);
+                doc.text('Meeting: ' + (state.selectedMeeting.title || '-'), 14, y);
+                y += 7;
+                doc.text('Date: ' + formatDateTime(state.selectedMeeting.date), 14, y);
+                y += 7;
+                doc.text('Duration: ' + String(state.selectedMeeting.duration || 0) + ' mins', 14, y);
+                y += 7;
+                doc.text('Team: ' + ((state.selectedMeeting.teamId && state.selectedMeeting.teamId.name) || 'Not Assigned'), 14, y);
+                y += 10;
+
+                doc.text('Total: ' + stats.total + ' | Joined: ' + stats.joined + ' | Absent: ' + stats.absent + ' | Attendance: ' + stats.percentage + '%', 14, y);
+                y += 10;
+
+                doc.setFontSize(10);
+                doc.text('Name', 14, y);
+                doc.text('Email', 58, y);
+                doc.text('Status', 125, y);
+                doc.text('Joined At', 160, y);
+                y += 4;
+                doc.line(14, y, 196, y);
+                y += 6;
+
+                state.attendanceRows.forEach(function (row) {
+                    if (y > 278) {
+                        doc.addPage();
+                        y = 14;
+                    }
+                    doc.text(String(row.name || '-').slice(0, 22), 14, y);
+                    doc.text(String(row.email || '-').slice(0, 32), 58, y);
+                    doc.text(String(row.status || '-'), 125, y);
+                    doc.text(formatTime(row.joinedAt), 160, y);
+                    y += 7;
+                });
+
+                var fileBase = (state.selectedMeeting.title || 'attendance').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+                doc.save(fileBase + '_report.pdf');
+            }
+
+            dom.meetingSearch.addEventListener('input', applySearchFilter);
+
+            dom.meetingList.addEventListener('click', function (event) {
+                var card = event.target.closest('.meeting-card');
+                if (!card) return;
+                var meeting = state.meetings.find(function (item) {
+                    return item._id === card.dataset.id;
+                });
+                if (!meeting) return;
+
+                state.selectedMeeting = meeting;
+                state.attendanceRows = [];
+                state.attendanceLoaded = false;
+                state.attendanceStatusFilter = 'all';
+                dom.initializeWrap.classList.remove('visible');
+                renderMeetingList();
+                renderMeetingDetails();
+                loadAttendance(meeting._id);
+            });
+
+            dom.tableToolbar.addEventListener('click', function (event) {
+                var chip = event.target.closest('.filter-chip[data-status-filter]');
+                if (!chip) return;
+                setAttendanceFilter(chip.getAttribute('data-status-filter'));
+            });
+
+            dom.attendanceBody.addEventListener('change', function (event) {
+                if (!event.target.classList.contains('status-select')) return;
+                var email = event.target.getAttribute('data-email');
+                var status = event.target.value;
+                updateManualStatus(email, status);
+            });
+
+            dom.initializeBtn.addEventListener('click', initializeAttendance);
+            dom.finalizeBtn.addEventListener('click', finalizeAttendance);
+            dom.exportBtn.addEventListener('click', exportAttendancePdf);
+
+            renderMeetingDetails();
+            loadMeetings();
+        })();
+    </script>
+    <script src="sidebar.js"></script>
+</body>
+</html>
