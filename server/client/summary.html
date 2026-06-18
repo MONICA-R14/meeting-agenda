@@ -449,6 +449,61 @@
                 max-width: 88vw;
             }
         }
+
+        /* ── Voice Input ───────────────────────────────────────────── */
+        .voice-notes-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .voice-notes-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .word-counter {
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+        .mic-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: #c9a84c;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            padding: 0;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .mic-btn:hover  { filter: brightness(1.15); }
+        .mic-btn.recording {
+            background: #ff4444;
+            animation: micPulse 0.9s ease-in-out infinite;
+        }
+        @keyframes micPulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,68,68,.6);  transform: scale(1);   }
+            50%     { box-shadow: 0 0 0 6px rgba(255,68,68,0); transform: scale(1.1); }
+        }
+        .voice-hint {
+            font-size: 0.75rem;
+            color: #ff4444;
+            min-height: 16px;
+        }
+        .interim-text {
+            font-size: 0.88rem;
+            color: #888;
+            font-style: italic;
+            min-height: 20px;
+            padding: 4px 2px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
@@ -465,6 +520,7 @@
             <a class="sidebar-link" href="summary.html" data-page="summary.html"><span class="sidebar-icon">📝</span><span class="sidebar-label">Summary</span></a>
             <a class="sidebar-link" href="teams.html" data-page="teams.html"><span class="sidebar-icon">👥</span><span class="sidebar-label">Teams</span></a>
             <a class="sidebar-link" href="tracker.html" data-page="tracker.html"><span class="sidebar-icon">✅</span><span class="sidebar-label">Action Tracker</span></a>
+            <a class="sidebar-link" href="score.html" data-page="score.html"><span class="sidebar-icon">⭐</span><span class="sidebar-label">Meeting Score</span></a>
             <a class="sidebar-link" href="attendance.html" data-page="attendance.html"><span class="sidebar-icon">📊</span><span class="sidebar-label">Attendance</span></a>
             <a class="sidebar-link" href="admin.html" data-page="admin.html"><span class="sidebar-icon">⚙️</span><span class="sidebar-label">Admin Panel</span></a>
             <a class="sidebar-link" href="#" id="sidebar-logout"><span class="sidebar-icon">🚪</span><span class="sidebar-label">Logout</span></a>
@@ -515,8 +571,16 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="meetingNotes">Meeting Notes</label>
+                        <div class="voice-notes-header">
+                            <label for="meetingNotes">Meeting Notes</label>
+                            <div class="voice-notes-controls">
+                                <span id="wordCounter" class="word-counter">0 words</span>
+                                <button class="mic-btn" id="micNotes" title="Click to speak your meeting notes">🎤</button>
+                            </div>
+                        </div>
                         <textarea id="meetingNotes" class="textarea" placeholder="Type your meeting notes here..."></textarea>
+                        <div id="interimText" class="interim-text"></div>
+                        <div class="voice-hint" id="hintNotes"></div>
                         <div id="charCounter" class="counter">0 characters</div>
                     </div>
 
@@ -874,6 +938,106 @@
         });
 
         initFromStorage();
+
+        // ── Voice Input (Continuous) ─────────────────────────────────────────
+        (function () {
+            var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var micBtn     = document.getElementById('micNotes');
+            var hintNotes  = document.getElementById('hintNotes');
+            var wordCtr    = document.getElementById('wordCounter');
+            var interimDiv = document.getElementById('interimText');
+
+            function updateWordCount() {
+                var text  = notesInput.value.trim();
+                var count = text ? text.split(/\s+/).length : 0;
+                wordCtr.textContent = count + (count === 1 ? ' word' : ' words');
+            }
+
+            // Keep word count in sync with manual typing too
+            notesInput.addEventListener('input', updateWordCount);
+            updateWordCount();
+
+            if (!SR) {
+                micBtn.addEventListener('click', function () {
+                    showToast('Voice input not supported in this browser. Please use Chrome.', 'error');
+                });
+                return;
+            }
+
+            var rec         = null;
+            var isRecording = false;
+            var committed   = '';
+
+            function startRecording() {
+                committed = notesInput.value;
+                rec = new SR();
+                rec.continuous      = true;
+                rec.interimResults  = true;
+                rec.lang            = 'en-US';
+
+                rec.onstart = function () {
+                    isRecording = true;
+                    micBtn.classList.add('recording');
+                    micBtn.textContent = '⏹';
+                    micBtn.title = 'Click to stop recording';
+                    hintNotes.textContent = 'Listening... speak your meeting notes';
+                };
+
+                rec.onresult = function (e) {
+                    var finalText   = '';
+                    var interimText = '';
+                    for (var i = e.resultIndex; i < e.results.length; i++) {
+                        if (e.results[i].isFinal) {
+                            finalText += e.results[i][0].transcript + ' ';
+                        } else {
+                            interimText += e.results[i][0].transcript;
+                        }
+                    }
+                    if (finalText) {
+                        committed = (committed + ' ' + finalText).replace(/\s+/g, ' ').trim();
+                        notesInput.value = committed;
+                        updateCharCounter();
+                        updateWordCount();
+                    }
+                    interimDiv.textContent = interimText || '';
+                };
+
+                rec.onerror = function (e) {
+                    if (e.error === 'no-speech') return; // silence is fine in continuous mode
+                    var msg = 'Voice error: ' + e.error;
+                    if (e.error === 'not-allowed') msg = 'Microphone access denied. Please allow mic permission.';
+                    showToast(msg, 'error');
+                    stopRecording();
+                };
+
+                rec.onend = function () {
+                    // Auto-restart to maintain continuous listening
+                    if (isRecording) {
+                        try { rec.start(); } catch (err) {}
+                    }
+                };
+
+                rec.start();
+            }
+
+            function stopRecording() {
+                isRecording = false;
+                if (rec) {
+                    rec.onend = null; // prevent auto-restart
+                    rec.stop();
+                    rec = null;
+                }
+                micBtn.classList.remove('recording');
+                micBtn.textContent = '🎤';
+                micBtn.title = 'Click to speak your meeting notes';
+                hintNotes.textContent  = '';
+                interimDiv.textContent = '';
+            }
+
+            micBtn.addEventListener('click', function () {
+                if (isRecording) { stopRecording(); } else { startRecording(); }
+            });
+        })();
     </script>
     <script src="sidebar.js"></script>
 </body>

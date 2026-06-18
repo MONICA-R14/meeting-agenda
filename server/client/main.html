@@ -397,6 +397,72 @@
             .main-layout { grid-template-columns: 1fr; }
             .left-panel { border-right: none; border-bottom: 1px solid var(--border); }
         }
+
+        /* ── Voice Input ───────────────────────────────────────────── */
+        .voice-input-wrapper {
+            position: relative;
+        }
+        .voice-input-wrapper textarea,
+        .voice-input-wrapper input {
+            padding-right: 48px;
+        }
+        .mic-btn {
+            position: absolute;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: #c9a84c;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            z-index: 5;
+            padding: 0;
+            line-height: 1;
+        }
+        .mic-btn-area   { bottom: 10px; top: auto; }
+        .mic-btn-inline { top: 50%; transform: translateY(-50%); }
+        .mic-btn:hover  { filter: brightness(1.15); }
+        .mic-btn.recording { background: #ff4444; animation: micPulse 0.9s ease-in-out infinite; }
+        .mic-btn-inline.recording { animation: micPulseInline 0.9s ease-in-out infinite; }
+        @keyframes micPulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,68,68,.6);   transform: scale(1); }
+            50%     { box-shadow: 0 0 0 6px rgba(255,68,68,0);  transform: scale(1.1); }
+        }
+        @keyframes micPulseInline {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,68,68,.6);   transform: translateY(-50%) scale(1); }
+            50%     { box-shadow: 0 0 0 6px rgba(255,68,68,0);  transform: translateY(-50%) scale(1.1); }
+        }
+        .voice-hint {
+            font-size: 0.75rem;
+            color: #ff4444;
+            min-height: 16px;
+            transition: opacity 0.2s;
+        }
+        .voice-toast-msg {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20,20,20,.95);
+            color: #e8e2d9;
+            border: 1px solid rgba(255,255,255,.15);
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            z-index: 9999;
+            pointer-events: none;
+            animation: voiceToastIn 0.22s ease;
+        }
+        @keyframes voiceToastIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0);   }
+        }
     </style>
 </head>
 <body>
@@ -413,6 +479,7 @@
             <a class="sidebar-link" href="summary.html" data-page="summary.html"><span class="sidebar-icon">📝</span><span class="sidebar-label">Summary</span></a>
             <a class="sidebar-link" href="teams.html" data-page="teams.html"><span class="sidebar-icon">👥</span><span class="sidebar-label">Teams</span></a>
             <a class="sidebar-link" href="tracker.html" data-page="tracker.html"><span class="sidebar-icon">✅</span><span class="sidebar-label">Action Tracker</span></a>
+            <a class="sidebar-link" href="score.html" data-page="score.html"><span class="sidebar-icon">⭐</span><span class="sidebar-label">Meeting Score</span></a>
             <a class="sidebar-link" href="attendance.html" data-page="attendance.html"><span class="sidebar-icon">📊</span><span class="sidebar-label">Attendance</span></a>
             <a class="sidebar-link" href="admin.html" data-page="admin.html"><span class="sidebar-icon">⚙️</span><span class="sidebar-label">Admin Panel</span></a>
             <a class="sidebar-link" href="#" id="sidebar-logout"><span class="sidebar-icon">🚪</span><span class="sidebar-label">Logout</span></a>
@@ -441,12 +508,20 @@
 
                 <div class="form-group">
                     <label>Meeting Goal</label>
-                    <textarea id="goal" rows="3" placeholder="e.g. Plan Q1 marketing strategy and align on priorities..."></textarea>
+                    <div class="voice-input-wrapper">
+                        <textarea id="goal" rows="3" placeholder="e.g. Plan Q1 marketing strategy and align on priorities..."></textarea>
+                        <button class="mic-btn mic-btn-area" id="mic-goal" title="Click to speak your meeting goal">🎤</button>
+                    </div>
+                    <div class="voice-hint" id="hint-goal"></div>
                 </div>
 
                 <div class="form-group">
                     <label>Attendees</label>
-                    <input type="text" id="attendees" placeholder="e.g. Marketing team, CEO, Designer" />
+                    <div class="voice-input-wrapper">
+                        <input type="text" id="attendees" placeholder="e.g. Marketing team, CEO, Designer" />
+                        <button class="mic-btn mic-btn-inline" id="mic-attendees" title="Click to speak attendee names">🎤</button>
+                    </div>
+                    <div class="voice-hint" id="hint-attendees"></div>
                 </div>
 
                 <div class="form-group">
@@ -768,6 +843,91 @@
                 showMessage('Failed to delete', 'error');
             }
         }
+
+        // ── Voice Input ──────────────────────────────────────────────────────
+        (function () {
+            var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var micGoal      = document.getElementById('mic-goal');
+            var micAttendees = document.getElementById('mic-attendees');
+            var hintGoal     = document.getElementById('hint-goal');
+            var hintAttendees= document.getElementById('hint-attendees');
+
+            function showVoiceToast(msg) {
+                var old = document.querySelector('.voice-toast-msg');
+                if (old) old.remove();
+                var t = document.createElement('div');
+                t.className = 'voice-toast-msg';
+                t.textContent = msg;
+                document.body.appendChild(t);
+                setTimeout(function () { t.remove(); }, 3500);
+            }
+
+            if (!SR) {
+                [micGoal, micAttendees].forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        showVoiceToast('Voice input not supported in this browser. Please use Chrome.');
+                    });
+                });
+                return;
+            }
+
+            var activeRec = null;
+            var activeFieldId = null;
+
+            function startVoiceFor(fieldId, micBtn, hintEl) {
+                if (activeFieldId === fieldId && activeRec) {
+                    activeRec.stop();
+                    return;
+                }
+                if (activeRec) { activeRec.stop(); }
+
+                var rec = new SR();
+                rec.continuous = false;
+                rec.interimResults = false;
+                rec.lang = 'en-US';
+
+                rec.onstart = function () {
+                    activeRec = rec;
+                    activeFieldId = fieldId;
+                    micBtn.classList.add('recording');
+                    hintEl.textContent = 'Listening...';
+                };
+
+                rec.onresult = function (e) {
+                    var transcript = e.results[0][0].transcript.trim();
+                    var field = document.getElementById(fieldId);
+                    if (fieldId === 'attendees') {
+                        var existing = field.value.trim();
+                        field.value = existing ? existing + ', ' + transcript : transcript;
+                    } else {
+                        field.value = transcript;
+                    }
+                };
+
+                rec.onerror = function (e) {
+                    var msg = 'Voice input error: ' + e.error;
+                    if (e.error === 'not-allowed') msg = 'Microphone access denied. Please allow mic permission in your browser.';
+                    else if (e.error === 'no-speech') msg = 'No speech detected. Please try again.';
+                    showVoiceToast(msg);
+                };
+
+                rec.onend = function () {
+                    micBtn.classList.remove('recording');
+                    hintEl.textContent = '';
+                    activeRec = null;
+                    activeFieldId = null;
+                };
+
+                rec.start();
+            }
+
+            micGoal.addEventListener('click', function () {
+                startVoiceFor('goal', micGoal, hintGoal);
+            });
+            micAttendees.addEventListener('click', function () {
+                startVoiceFor('attendees', micAttendees, hintAttendees);
+            });
+        })();
     </script>
     <script src="sidebar.js"></script>
 </body>

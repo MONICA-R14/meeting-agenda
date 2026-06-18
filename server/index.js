@@ -27,6 +27,7 @@ app.use('/api/team', require('./routes/team'));
 app.use('/api/schedule', require('./routes/schedule'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/actionitems', require('./routes/actionitem'));
+app.use('/api/score', require('./routes/score'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Test route

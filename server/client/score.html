@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Score | Agenda Builder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="sidebar.css" />
+    <style>
+        :root {
+            --bg:       #0d0d1a;
+            --card:     #16213e;
+            --text:     #e8e2d9;
+            --muted:    #97a0b5;
+            --border:   rgba(255,255,255,0.1);
+            --gold:     #c9a84c;
+            --gold-g:   linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fcf6ba, #aa771c);
+            --cyan:     #00bcd4;
+            --green:    #6cd98e;
+            --danger:   #ff6f7d;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: radial-gradient(circle at 10% 20%, rgba(201,168,76,.07), transparent 40%),
+                        radial-gradient(circle at 90% 0%,  rgba(0,188,212,.08),  transparent 35%),
+                        var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+        }
+
+        .page { padding: 26px; }
+
+        /* ── Page header ── */
+        .page-header { margin-bottom: 24px; }
+        .page-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            font-weight: 500;
+            color: var(--gold);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .page-subtitle { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+
+        /* ── Stats row ── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: rgba(22,33,62,.8);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.2rem 1.4rem;
+            text-align: center;
+        }
+        .stat-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+        .stat-value { font-family: 'Cormorant Garamond', serif; font-size: 2.4rem; font-weight: 600; line-height: 1; }
+        .stat-value.gold  { color: var(--gold); }
+        .stat-value.cyan  { color: var(--cyan); }
+        .stat-value.green { color: var(--green); }
+        .stat-trend { font-size: 0.78rem; margin-top: 6px; }
+        .stat-trend.improving { color: var(--green); }
+        .stat-trend.declining { color: var(--danger); }
+        .stat-trend.stable    { color: var(--muted); }
+
+        /* ── Main layout ── */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 2fr 3fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        /* ── Panels ── */
+        .panel {
+            background: rgba(22,33,62,.68);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            backdrop-filter: blur(8px);
+            padding: 1.4rem;
+        }
+        .panel-heading {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            font-weight: 500;
+            color: var(--gold);
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ── Form ── */
+        .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+        .form-group label {
+            font-size: 0.78rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .07em;
+        }
+        .form-group select,
+        .form-group input {
+            background: rgba(8,10,24,.65);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 10px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.95rem;
+            padding: 10px 14px;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .form-group select:focus,
+        .form-group input:focus  { border-color: var(--gold); }
+        .form-group select option { background: #1c1f24; }
+
+        /* Toggle switch */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(8,10,24,.45);
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+        }
+        .toggle-label { font-size: 0.9rem; color: var(--text); }
+        .toggle-switch { position: relative; width: 44px; height: 24px; cursor: pointer; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-track {
+            position: absolute; inset: 0;
+            background: rgba(255,255,255,.15);
+            border-radius: 24px;
+            transition: background .25s;
+        }
+        .toggle-track::after {
+            content: '';
+            position: absolute;
+            width: 18px; height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            top: 3px; left: 3px;
+            transition: transform .25s;
+        }
+        .toggle-switch input:checked + .toggle-track { background: var(--gold); }
+        .toggle-switch input:checked + .toggle-track::after { transform: translateX(20px); }
+
+        /* Calculate button */
+        .calc-btn {
+            width: 100%;
+            padding: 13px;
+            background: var(--gold-g);
+            border: none;
+            border-radius: 12px;
+            color: #161515;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 700;
+            font-size: 0.98rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform .2s, filter .2s;
+            margin-top: 4px;
+        }
+        .calc-btn:hover:not(:disabled)  { transform: translateY(-1px); filter: brightness(1.05); }
+        .calc-btn:disabled { opacity: .65; cursor: not-allowed; transform: none; }
+        .btn-spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(22,21,21,.6);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            display: none;
+        }
+        .calc-btn.loading .btn-spinner { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Score result panel ── */
+        .result-panel { display: none; }
+        .result-panel.visible { display: block; }
+
+        /* Circular score */
+        .score-circle-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 1.4rem;
+        }
+        .score-ring-svg { width: 140px; height: 140px; }
+        .score-ring-bg   { fill: none; stroke: rgba(255,255,255,.08); stroke-width: 10; }
+        .score-ring-fill {
+            fill: none;
+            stroke-width: 10;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+            transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1),
+                        stroke .4s;
+        }
+        .score-text-group { text-anchor: middle; dominant-baseline: middle; }
+        .score-big   { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 600; }
+        .score-label { font-size: 11px; fill: #97a0b5; }
+        .score-grade-badge {
+            margin-top: 10px;
+            padding: 4px 18px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: .04em;
+        }
+
+        /* Breakdown rows */
+        .breakdown-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.4rem; }
+        .breakdown-row {
+            display: grid;
+            grid-template-columns: 120px 1fr 56px;
+            align-items: center;
+            gap: 10px;
+        }
+        .breakdown-name { font-size: 0.84rem; color: var(--muted); }
+        .bar-track {
+            height: 7px;
+            background: rgba(255,255,255,.08);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 1s ease;
+        }
+        .breakdown-pts {
+            font-size: 0.82rem;
+            color: var(--text);
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        /* AI Tip */
+        .tip-box {
+            background: rgba(201,168,76,.07);
+            border: 1px solid rgba(201,168,76,.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .tip-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+        .tip-text { font-size: 0.9rem; color: var(--text); line-height: 1.6; }
+
+        /* ── History ── */
+        .history-section { margin-top: 28px; }
+        .history-heading {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            color: var(--gold);
+            margin-bottom: 14px;
+        }
+        .history-table-wrap { overflow-x: auto; }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+        .history-table th {
+            text-align: left;
+            padding: 9px 12px;
+            color: var(--muted);
+            font-weight: 500;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            border-bottom: 1px solid var(--border);
+        }
+        .history-table td {
+            padding: 11px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.05);
+            color: var(--text);
+            vertical-align: middle;
+        }
+        .history-table tr:last-child td { border-bottom: none; }
+        .grade-chip {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+        .grade-A-plus { background: rgba(108,217,142,.18); color: #6cd98e; border: 1px solid rgba(108,217,142,.4); }
+        .grade-A      { background: rgba(108,217,142,.12); color: #6cd98e; border: 1px solid rgba(108,217,142,.3); }
+        .grade-B-plus { background: rgba(201,168,76,.15);  color: var(--gold); border: 1px solid rgba(201,168,76,.35); }
+        .grade-B      { background: rgba(201,168,76,.10);  color: var(--gold); border: 1px solid rgba(201,168,76,.25); }
+        .grade-C      { background: rgba(255,165,0,.12);   color: #ffaa44;     border: 1px solid rgba(255,165,0,.3); }
+        .grade-D      { background: rgba(255,111,125,.12); color: var(--danger); border: 1px solid rgba(255,111,125,.3); }
+        .empty-history { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+
+        /* ── Toast ── */
+        .toast-stack {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 2000;
+        }
+        .toast {
+            min-width: 260px;
+            max-width: 340px;
+            border-radius: 11px;
+            border: 1px solid;
+            padding: 10px 14px;
+            font-size: 0.88rem;
+            animation: toastIn .22s ease;
+        }
+        .toast.success { background: rgba(43,122,67,.96); border-color: rgba(129,234,166,.5); color: #fff; }
+        .toast.error   { background: rgba(139,37,52,.96); border-color: rgba(255,133,149,.45); color: #fff; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 1100px) {
+            .main-layout    { grid-template-columns: 1fr; }
+            .stats-row      { grid-template-columns: repeat(3,1fr); }
+        }
+        @media (max-width: 640px) {
+            .page           { padding: 14px; }
+            .stats-row      { grid-template-columns: 1fr 1fr; }
+            .breakdown-row  { grid-template-columns: 100px 1fr 46px; }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Agenda Builder</div>
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+        </div>
+        <nav class="sidebar-nav">
+            <a class="sidebar-link" href="main.html"       data-page="main.html">      <span class="sidebar-icon">🏠</span><span class="sidebar-label">Home</span></a>
+            <a class="sidebar-link" href="calendar.html"   data-page="calendar.html">  <span class="sidebar-icon">📅</span><span class="sidebar-label">Calendar</span></a>
+            <a class="sidebar-link" href="timer.html"      data-page="timer.html">     <span class="sidebar-icon">⏱️</span><span class="sidebar-label">Meeting Timer</span></a>
+            <a class="sidebar-link" href="summary.html"    data-page="summary.html">   <span class="sidebar-icon">📝</span><span class="sidebar-label">Summary</span></a>
+            <a class="sidebar-link" href="teams.html"      data-page="teams.html">     <span class="sidebar-icon">👥</span><span class="sidebar-label">Teams</span></a>
+            <a class="sidebar-link" href="tracker.html"    data-page="tracker.html">   <span class="sidebar-icon">✅</span><span class="sidebar-label">Action Tracker</span></a>
+            <a class="sidebar-link" href="score.html"      data-page="score.html">     <span class="sidebar-icon">⭐</span><span class="sidebar-label">Meeting Score</span></a>
+            <a class="sidebar-link" href="attendance.html" data-page="attendance.html"><span class="sidebar-icon">📊</span><span class="sidebar-label">Attendance</span></a>
+            <a class="sidebar-link" href="admin.html"      data-page="admin.html">     <span class="sidebar-icon">⚙️</span><span class="sidebar-label">Admin Panel</span></a>
+            <a class="sidebar-link" href="#" id="sidebar-logout"><span class="sidebar-icon">🚪</span><span class="sidebar-label">Logout</span></a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <span class="sidebar-icon">👤</span>
+                <span class="sidebar-user-name" id="sidebar-user-name">Guest User</span>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-shell">
+        <main class="page">
+            <!-- Page header -->
+            <div class="page-header">
+                <h1 class="page-title">⭐ Meeting Score</h1>
+                <p class="page-subtitle">Rate and improve your meetings</p>
+            </div>
+
+            <!-- Stats row -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-label">Average Score</div>
+                    <div class="stat-value gold" id="statAvg">—</div>
+                    <div class="stat-trend" id="statTrend"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Meetings Scored</div>
+                    <div class="stat-value cyan" id="statTotal">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Best Score</div>
+                    <div class="stat-value green" id="statBest">—</div>
+                </div>
+            </div>
+
+            <!-- Main layout -->
+            <div class="main-layout">
+
+                <!-- Left: Score a meeting -->
+                <div class="panel">
+                    <div class="panel-heading">📋 Score a Meeting</div>
+
+                    <div class="form-group">
+                        <label>Select Completed Meeting</label>
+                        <select id="meetingSelect">
+                            <option value="">Loading meetings...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Actual Duration (minutes)</label>
+                        <input type="number" id="actualDuration" min="1" placeholder="e.g. 65" />
+                    </div>
+
+                    <div class="toggle-row">
+                        <span class="toggle-label">Started on time?</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="onTimeToggle" />
+                            <span class="toggle-track"></span>
+                        </label>
+                    </div>
+
+                    <button class="calc-btn" id="calcBtn">
+                        <span class="btn-spinner"></span>
+                        <span id="calcBtnText">⭐ Calculate Score</span>
+                    </button>
+                </div>
+
+                <!-- Right: Result -->
+                <div class="panel result-panel" id="resultPanel">
+                    <div class="panel-heading">📊 Score Result</div>
+
+                    <!-- Circular score display -->
+                    <div class="score-circle-wrap">
+                        <svg class="score-ring-svg" viewBox="0 0 140 140">
+                            <circle class="score-ring-bg"   cx="70" cy="70" r="56"/>
+                            <circle class="score-ring-fill" id="scoreRing" cx="70" cy="70" r="56"
+                                    stroke-dasharray="351.86" stroke-dashoffset="351.86" stroke="#c9a84c"/>
+                            <text class="score-text-group" x="70" y="63">
+                                <tspan class="score-big"  id="scoreBig"  fill="#e8e2d9">0</tspan>
+                            </text>
+                            <text class="score-text-group" x="70" y="85">
+                                <tspan class="score-label">/10</tspan>
+                            </text>
+                        </svg>
+                        <div class="score-grade-badge" id="gradeBadge">—</div>
+                    </div>
+
+                    <!-- Breakdown -->
+                    <div class="breakdown-list" id="breakdownList"></div>
+
+                    <!-- AI Tip -->
+                    <div class="tip-box" id="tipBox" style="display:none;">
+                        <span class="tip-icon">💡</span>
+                        <span class="tip-text" id="tipText"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div class="history-section">
+                <div class="history-heading">📁 Score History</div>
+                <div class="panel history-table-wrap">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Meeting</th>
+                                <th>Date</th>
+                                <th>Score</th>
+                                <th>Grade</th>
+                                <th>AI Tip</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast-stack" id="toastStack" aria-live="assertive"></div>
+
+    <script>
+        const API   = '/api';
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = 'index.html';
+
+        // ── Toast ──────────────────────────────────────────────────────────
+        function showToast(msg, type) {
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.textContent = msg;
+            document.getElementById('toastStack').appendChild(t);
+            setTimeout(() => t.remove(), 3200);
+        }
+
+        const authHeaders = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        // ── Load stats ─────────────────────────────────────────────────────
+        async function loadStats() {
+            try {
+                const res  = await fetch(`${API}/score/stats`, { headers: authHeaders });
+                const json = await res.json();
+                if (!res.ok) return;
+                const d = json.data;
+                document.getElementById('statAvg').textContent   = d.totalMeetingsScored ? d.averageScore : '—';
+                document.getElementById('statTotal').textContent = d.totalMeetingsScored || 0;
+                document.getElementById('statBest').textContent  = d.bestScore || '—';
+                const trendEl = document.getElementById('statTrend');
+                if (d.trend && d.trend !== 'stable') {
+                    trendEl.textContent = d.trend === 'improving' ? '▲ Improving' : '▼ Declining';
+                    trendEl.className   = `stat-trend ${d.trend}`;
+                }
+            } catch (_) {}
+        }
+
+        // ── Load completed meetings into dropdown ──────────────────────────
+        async function loadMeetings() {
+            const sel = document.getElementById('meetingSelect');
+            try {
+                const res  = await fetch(`${API}/schedule`, { headers: authHeaders });
+                const json = await res.json();
+                if (!res.ok || !Array.isArray(json.data)) throw new Error();
+                const completed = json.data.filter(m => m.status === 'completed');
+                if (!completed.length) {
+                    sel.innerHTML = '<option value="">No completed meetings found</option>';
+                    return;
+                }
+                sel.innerHTML = '<option value="">— Select a meeting —</option>' +
+                    completed.map(m => {
+                        const d = new Date(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        return `<option value="${m._id}">${m.title} · ${d}</option>`;
+                    }).join('');
+            } catch (_) {
+                sel.innerHTML = '<option value="">Failed to load meetings</option>';
+            }
+        }
+
+        // ── Load score history ─────────────────────────────────────────────
+        async function loadHistory() {
+            const tbody = document.getElementById('historyBody');
+            try {
+                const res  = await fetch(`${API}/score/history`, { headers: authHeaders });
+                const json = await res.json();
+                if (!res.ok || !Array.isArray(json.data)) throw new Error();
+                if (!json.data.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-history">No scores yet. Score a meeting to get started.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = json.data.map(s => {
+                    const title = s.scheduleId ? s.scheduleId.title : 'Unknown';
+                    const date  = s.scheduleId
+                        ? new Date(s.scheduleId.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const gradeClass = 'grade-' + s.grade.replace('+', '-plus');
+                    const tip  = s.tip ? s.tip.slice(0, 60) + (s.tip.length > 60 ? '…' : '') : '—';
+                    return `<tr>
+                        <td>${title}</td>
+                        <td>${date}</td>
+                        <td><strong>${s.score}/10</strong></td>
+                        <td><span class="grade-chip ${gradeClass}">${s.grade}</span></td>
+                        <td style="max-width:240px;font-size:0.82rem;color:var(--muted);">${tip}</td>
+                    </tr>`;
+                }).join('');
+            } catch (_) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-history">Failed to load history.</td></tr>';
+            }
+        }
+
+        // ── Render score result ────────────────────────────────────────────
+        function renderScore(data) {
+            const { score, grade, breakdown, tip } = data;
+            const circumference = 351.86; // 2π × 56
+
+            // Ring colour
+            let ringColor = '#ff6f7d';
+            if (score >= 8) ringColor = '#6cd98e';
+            else if (score >= 6) ringColor = '#c9a84c';
+
+            const ring = document.getElementById('scoreRing');
+            ring.style.stroke = ringColor;
+            ring.style.strokeDashoffset = circumference;
+            // Animate
+            requestAnimationFrame(() => {
+                ring.style.strokeDashoffset = circumference - (score / 10) * circumference;
+            });
+
+            document.getElementById('scoreBig').textContent = score;
+            document.getElementById('scoreBig').setAttribute('fill', ringColor);
+
+            // Grade badge
+            const badge = document.getElementById('gradeBadge');
+            badge.textContent = grade;
+            badge.style.background = score >= 8 ? 'rgba(108,217,142,.18)' : score >= 6 ? 'rgba(201,168,76,.15)' : 'rgba(255,111,125,.12)';
+            badge.style.color      = score >= 8 ? '#6cd98e' : score >= 6 ? '#c9a84c' : '#ff6f7d';
+            badge.style.border     = `1px solid ${score >= 8 ? 'rgba(108,217,142,.4)' : score >= 6 ? 'rgba(201,168,76,.35)' : 'rgba(255,111,125,.3)'}`;
+
+            // Breakdown
+            const categoryLabels = {
+                attendance:     'Attendance',
+                timeManagement: 'Time Mgmt',
+                actionItems:    'Action Items',
+                summary:        'Summary',
+                punctuality:    'Punctuality'
+            };
+            const list = document.getElementById('breakdownList');
+            list.innerHTML = '';
+            for (const [key, val] of Object.entries(breakdown)) {
+                const pct   = Math.round((val.points / val.max) * 100);
+                const color = pct === 100 ? '#6cd98e' : pct >= 50 ? '#c9a84c' : '#ff6f7d';
+                list.innerHTML += `
+                    <div class="breakdown-row" title="${val.detail}">
+                        <span class="breakdown-name">${categoryLabels[key] || key}</span>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width:0%;background:${color}" data-target="${pct}%"></div>
+                        </div>
+                        <span class="breakdown-pts">${val.points}/${val.max}</span>
+                    </div>`;
+            }
+            // Animate bars
+            requestAnimationFrame(() => {
+                list.querySelectorAll('.bar-fill').forEach(bar => {
+                    bar.style.width = bar.dataset.target;
+                });
+            });
+
+            // Tip
+            if (tip) {
+                document.getElementById('tipText').textContent = tip;
+                document.getElementById('tipBox').style.display = 'flex';
+            }
+
+            document.getElementById('resultPanel').classList.add('visible');
+        }
+
+        // ── Calculate score ────────────────────────────────────────────────
+        document.getElementById('calcBtn').addEventListener('click', async function () {
+            const scheduleId     = document.getElementById('meetingSelect').value;
+            const actualDuration = document.getElementById('actualDuration').value;
+            const startedOnTime  = document.getElementById('onTimeToggle').checked;
+            const btn            = document.getElementById('calcBtn');
+            const btnText        = document.getElementById('calcBtnText');
+
+            if (!scheduleId) { showToast('Please select a meeting.', 'error'); return; }
+            if (!actualDuration) { showToast('Please enter the actual duration.', 'error'); return; }
+
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btnText.textContent = 'Calculating...';
+
+            try {
+                const res  = await fetch(`${API}/score/calculate`, {
+                    method:  'POST',
+                    headers: authHeaders,
+                    body:    JSON.stringify({ scheduleId, actualDuration: Number(actualDuration), startedOnTime })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showToast(data.message || 'Failed to calculate score.', 'error');
+                    return;
+                }
+
+                renderScore(data);
+                showToast(`Score calculated: ${data.score}/10 (${data.grade})`, 'success');
+                loadStats();
+                loadHistory();
+            } catch (_) {
+                showToast('Could not connect to server.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('loading');
+                btnText.textContent = '⭐ Calculate Score';
+            }
+        });
+
+        // ── Init ──────────────────────────────────────────────────────────
+        loadStats();
+        loadMeetings();
+        loadHistory();
+    </script>
+    <script src="sidebar.js"></script>
+</body>
+</html>
